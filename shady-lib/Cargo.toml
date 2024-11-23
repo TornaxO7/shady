@@ -1,0 +1,16 @@
+[package]
+name = "shady"
+version = "0.1.0"
+edition = "2021"
+authors = ["TornaxO7 <tornax@pm.me>"]
+description = "A shadertoy-like library to be able to easily integrate shadertoy-like stuff in your applications."
+license = "GPL2"
+
+[dependencies]
+cpal = "0.15"
+realfft = "3.4"
+bytemuck = { version = "1", features = ["derive"] }
+
+wgpu.workspace = true
+tracing.workspace = true
+thiserror.workspace = true

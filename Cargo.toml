@@ -1,0 +1,8 @@
+[workspace]
+members = ["shady-lib", "shady-app"]
+resolver = "2"
+
+[workspace.dependencies]
+wgpu = "22.0"
+tracing = "0.1"
+thiserror = "2"
