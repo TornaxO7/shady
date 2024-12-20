@@ -162,8 +162,12 @@ impl<'a> State<'a> {
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
-        self.shady
-            .update_resolution(new_size.width as f32, new_size.height as f32);
+        if new_size.width > 0 && new_size.height > 0 {
+            self.shady
+                .update_resolution(new_size.width as f32, new_size.height as f32);
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+        }
     }
 }
 
