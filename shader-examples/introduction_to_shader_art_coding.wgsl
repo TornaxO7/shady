@@ -3,11 +3,19 @@
 @group(0) @binding(0)
 var<uniform> iTime: f32;
 
+// x: width
+// y: height
 @group(0) @binding(1)
-var<uniform> iResolution: vec3<f32>;
+var<uniform> iResolution: vec2<f32>;
 
+// x: bass
+// y: mid
+// z: treble
 @group(0) @binding(2)
-var<uniform> iAudio: vec4<f32>;
+var<uniform> iAudio: vec3<f32>;
+
+@group(0) @binding(4)
+var<uniform> iFrame: u32;
 
 fn palette(t: f32) -> vec3<f32> {
     let a = vec3<f32>(0.5, 0.5, 0.5);
