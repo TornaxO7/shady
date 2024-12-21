@@ -59,6 +59,8 @@ impl<F: Frontend> Shady<F> {
         fragment_shader: S,
         texture_format: &wgpu::TextureFormat,
     ) -> Result<wgpu::RenderPipeline, Error> {
+        self.uniforms.frame.reset_counter();
+
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shady vertex shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
@@ -127,7 +129,8 @@ impl<F: Frontend> Shady<F> {
         self.uniforms.resolution.update_resolution(width, height);
     }
 
-    pub fn update_buffers(&mut self, queue: &mut wgpu::Queue) {
+    pub fn prepare_next_frame(&mut self, queue: &mut wgpu::Queue) {
+        self.uniforms.frame.next_frame();
         self.uniforms.update_buffers(queue);
     }
 }

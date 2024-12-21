@@ -11,6 +11,8 @@ layout(binding = 1) uniform vec2 iResolution;
 // z: treble
 layout(binding = 2) uniform vec3 iAudio;
 
+layout(binding = 4) uniform double iFrame;
+
 layout(location = 0) out vec4 fragColor;
 
 void main() {

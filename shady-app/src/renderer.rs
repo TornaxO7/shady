@@ -110,7 +110,7 @@ impl<'a, F: Frontend> State<'a, F> {
     }
 
     pub fn prepare_next_frame(&mut self) {
-        self.shady.update_buffers(&mut self.queue);
+        self.shady.prepare_next_frame(&mut self.queue);
     }
 
     pub fn render(&mut self) -> Result<(), RenderError> {

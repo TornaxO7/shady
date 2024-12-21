@@ -1,10 +1,12 @@
 #[cfg(feature = "audio")]
 mod audio;
+mod frame;
 mod resolution;
 mod time;
 
 #[cfg(feature = "audio")]
 use audio::Audio;
+use frame::Frame;
 use resolution::Resolution;
 use time::Time;
 use tracing::instrument;
@@ -40,6 +42,7 @@ pub struct Uniforms {
     pub resolution: Resolution,
     #[cfg(feature = "audio")]
     pub audio: Audio,
+    pub frame: Frame,
 }
 
 impl Uniforms {
@@ -50,6 +53,7 @@ impl Uniforms {
             resolution: Resolution::new(device),
             #[cfg(feature = "audio")]
             audio: Audio::new(device),
+            frame: Frame::new(device),
         }
     }
 
@@ -60,6 +64,7 @@ impl Uniforms {
 
         #[cfg(feature = "audio")]
         self.audio.update_buffer(queue);
+        self.frame.update_buffer(queue);
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -68,6 +73,7 @@ impl Uniforms {
         self.resolution.cleanup();
         #[cfg(feature = "audio")]
         self.audio.cleanup();
+        self.frame.cleanup();
     }
 }
 
@@ -81,6 +87,7 @@ impl Uniforms {
                 bind_group_layout_entry(Resolution::binding()),
                 #[cfg(feature = "audio")]
                 bind_group_layout_entry(Audio::binding()),
+                bind_group_layout_entry(Frame::binding()),
             ],
         })
     }
@@ -105,6 +112,10 @@ impl Uniforms {
                 wgpu::BindGroupEntry {
                     binding: Audio::binding(),
                     resource: self.audio.buffer().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: Frame::binding(),
+                    resource: self.frame.buffer().as_entire_binding(),
                 },
             ],
         })

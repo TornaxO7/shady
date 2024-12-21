@@ -95,7 +95,7 @@ impl<'a> State<'a> {
 
     pub fn prepare_next_frame(&mut self) {
         // SHADY
-        self.shady.update_buffers(&mut self.queue);
+        self.shady.prepare_next_frame(&mut self.queue);
 
         self.surface.configure(&self.device, &self.config);
     }
