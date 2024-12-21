@@ -1,9 +1,13 @@
+use wgpu::Device;
+
 use super::Uniform;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Resolution {
     width: u32,
     height: u32,
+
+    buffer: wgpu::Buffer,
 }
 
 impl Resolution {
@@ -18,6 +22,16 @@ impl Resolution {
 impl Uniform for Resolution {
     type BufferDataType = [f32; 2];
 
+    fn new(device: &Device) -> Self {
+        let buffer = Self::create_buffer(device);
+
+        Self {
+            width: 0,
+            height: 0,
+            buffer,
+        }
+    }
+
     fn buffer_label() -> &'static str {
         "Shady iResolution buffer"
     }
@@ -26,7 +40,7 @@ impl Uniform for Resolution {
         1
     }
 
-    fn update_buffer(&self, queue: &mut wgpu::Queue, device: &wgpu::Device) {
+    fn update_buffer(&self, queue: &mut wgpu::Queue) {
         let data = {
             let width = self.width as f32;
             let height = self.height as f32;
@@ -34,8 +48,12 @@ impl Uniform for Resolution {
             [width, height]
         };
 
-        queue.write_buffer(&Self::buffer(device), 0, bytemuck::cast_slice(&data));
+        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&data));
     }
 
     fn cleanup(&mut self) {}
+
+    fn buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
 }

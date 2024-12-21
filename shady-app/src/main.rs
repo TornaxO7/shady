@@ -116,11 +116,7 @@ fn watch_shader_file<P: AsRef<Path>>(path: P, proxy: Arc<EventLoopProxy<UserEven
                     EventKind::Remove(_) => {
                         watcher.watch(path.as_ref(), RecursiveMode::NonRecursive)?;
                     }
-                    EventKind::Modify(_) => {
-                        // we wait some time first, since some editors might quickly remove it and reinsert the file
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        proxy.send_event(UserEvent::UpdatePath)?
-                    }
+                    EventKind::Modify(_) => proxy.send_event(UserEvent::UpdatePath)?,
                     _ => (),
                 };
             }

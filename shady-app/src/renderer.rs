@@ -3,7 +3,7 @@ use std::{fs::File, io::Read, path::PathBuf, sync::Arc};
 use ariadne::{Color, Fmt, Label, Report, Source};
 use pollster::FutureExt;
 use shady::{Frontend, Shady};
-use tracing::{trace, warn};
+use tracing::{debug, trace, warn};
 use wgpu::{
     Backends, Device, Instance, Queue, RenderPipeline, Surface, SurfaceConfiguration, SurfaceError,
     TextureViewDescriptor,
@@ -35,6 +35,9 @@ struct State<'a, F: Frontend> {
     window: Arc<Window>,
     shady: Shady<F>,
     pipeline: RenderPipeline,
+
+    vbuffer: wgpu::Buffer,
+    ibuffer: wgpu::Buffer,
 }
 
 impl<'a, F: Frontend> State<'a, F> {
@@ -64,7 +67,7 @@ impl<'a, F: Frontend> State<'a, F> {
             .block_on()
             .expect("Retrieve device and queue");
 
-        let mut shady = Shady::new();
+        let mut shady = Shady::new(&device);
 
         let config = {
             let surface_caps = surface.get_capabilities(&adapter);
@@ -90,6 +93,8 @@ impl<'a, F: Frontend> State<'a, F> {
         };
 
         let pipeline = shady.get_render_pipeline(&device, fragment_code, &config.format)?;
+        let vbuffer = shady::vertex_buffer(&device);
+        let ibuffer = shady::index_buffer(&device);
 
         Ok(Self {
             surface,
@@ -99,11 +104,13 @@ impl<'a, F: Frontend> State<'a, F> {
             window,
             shady,
             pipeline,
+            vbuffer,
+            ibuffer,
         })
     }
 
     pub fn prepare_next_frame(&mut self) {
-        self.shady.update_buffers(&mut self.queue, &self.device);
+        self.shady.update_buffers(&mut self.queue);
 
         self.surface.configure(&self.device, &self.config);
     }
@@ -135,12 +142,9 @@ impl<'a, F: Frontend> State<'a, F> {
             });
 
             render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &shady::bind_group(&self.device), &[]);
-            render_pass.set_vertex_buffer(0, shady::vertex_buffer(&self.device).slice(..));
-            render_pass.set_index_buffer(
-                shady::index_buffer(&self.device).slice(..),
-                wgpu::IndexFormat::Uint16,
-            );
+            render_pass.set_bind_group(0, &self.shady.bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vbuffer.slice(..));
+            render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(shady::index_buffer_range(), 0, 0..1);
         }
 
@@ -200,7 +204,12 @@ impl<'a, F: Frontend> Renderer<'a, F> {
     fn refresh_fragment_code(&mut self) -> Result<(), RenderError> {
         self.display_error = true;
 
+        debug!(
+            "Trying to read from: {}",
+            self.fragment_path.to_string_lossy()
+        );
         let mut file = File::open(&self.fragment_path)?;
+        self.fragment_code.clear();
         file.read_to_string(&mut self.fragment_code)?;
 
         if let Some(state) = &mut self.state {
@@ -275,8 +284,8 @@ impl<'a, F: Frontend> ApplicationHandler<UserEvent> for Renderer<'a, F> {
                     Ok(_) => {
                         if !self.display_error {
                             println!("[{}] Everything clear", "OK".fg(Color::Green));
+                            self.display_error = true;
                         }
-                        self.display_error = true;
                     }
                     Err(RenderError::SurfaceError(SurfaceError::OutOfMemory)) => {
                         unreachable!("Out of memory")

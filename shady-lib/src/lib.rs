@@ -8,7 +8,6 @@ use uniforms::Uniforms;
 use wgpu::Device;
 
 pub use frontend::{Frontend, GlslFrontend, WgslFrontend};
-pub use uniforms::bind_group;
 pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
 
 #[derive(thiserror::Error, Debug)]
@@ -29,15 +28,21 @@ pub enum Error {
 
 pub struct Shady<F: Frontend> {
     uniforms: Uniforms,
+    pub bind_group: wgpu::BindGroup,
     frontend: F,
 }
 
 // General functions
 impl<F: Frontend> Shady<F> {
     #[instrument(level = "trace")]
-    pub fn new() -> Self {
+    pub fn new(device: &Device) -> Self {
+        let uniforms = Uniforms::new(device);
+
+        let bind_group = uniforms.bind_group(device);
+
         Self {
-            uniforms: Uniforms::new(),
+            uniforms: Uniforms::new(device),
+            bind_group,
             frontend: F::new(),
         }
     }
@@ -70,7 +75,7 @@ impl<F: Frontend> Shady<F> {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shady pipeline layout"),
-            bind_group_layouts: &[&uniforms::bind_group_layout(device)],
+            bind_group_layouts: &[&Uniforms::bind_group_layout(device)],
             push_constant_ranges: &[],
         });
 
@@ -122,7 +127,7 @@ impl<F: Frontend> Shady<F> {
         self.uniforms.resolution.update_resolution(width, height);
     }
 
-    pub fn update_buffers(&self, queue: &mut wgpu::Queue, device: &Device) {
-        self.uniforms.update_buffers(queue, device);
+    pub fn update_buffers(&mut self, queue: &mut wgpu::Queue) {
+        self.uniforms.update_buffers(queue);
     }
 }

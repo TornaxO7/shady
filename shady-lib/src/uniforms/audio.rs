@@ -5,6 +5,7 @@ use cpal::{
     SampleRate, Stream,
 };
 use realfft::{num_complex::Complex32, RealFftPlanner};
+use wgpu::Device;
 
 use super::Uniform;
 
@@ -14,31 +15,14 @@ pub struct Audio {
     data: Arc<Mutex<[f32; AUDIO_BUFFER_SIZE]>>,
     stream: Stream,
     _fft: Arc<Mutex<FftWrapper>>,
+
+    buffer: wgpu::Buffer,
 }
 
 impl Uniform for Audio {
     type BufferDataType = [f32; AUDIO_BUFFER_SIZE];
 
-    fn buffer_label() -> &'static str {
-        "Shady iAudio buffer"
-    }
-
-    fn binding() -> u32 {
-        2
-    }
-
-    fn update_buffer(&self, queue: &mut wgpu::Queue, device: &wgpu::Device) {
-        let data = self.data.lock().unwrap();
-        queue.write_buffer(&Self::buffer(device), 0, bytemuck::cast_slice(&*data));
-    }
-
-    fn cleanup(&mut self) {
-        self.stream.pause().expect("Close audio stream");
-    }
-}
-
-impl Audio {
-    pub fn new() -> Self {
+    fn new(device: &Device) -> Self {
         let fft = Arc::new(Mutex::new(FftWrapper::new()));
         let data = Arc::new(Mutex::new([0f32; AUDIO_BUFFER_SIZE]));
 
@@ -87,11 +71,35 @@ impl Audio {
 
         stream.play().unwrap();
 
+        let buffer = Self::create_buffer(device);
+
         Self {
             data,
             stream,
             _fft: fft,
+            buffer,
         }
+    }
+
+    fn buffer_label() -> &'static str {
+        "Shady iAudio buffer"
+    }
+
+    fn buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
+
+    fn binding() -> u32 {
+        2
+    }
+
+    fn update_buffer(&self, queue: &mut wgpu::Queue) {
+        let data = self.data.lock().unwrap();
+        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&*data));
+    }
+
+    fn cleanup(&mut self) {
+        self.stream.pause().expect("Close audio stream");
     }
 }
 
