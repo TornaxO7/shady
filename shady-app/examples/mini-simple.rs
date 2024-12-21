@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use pollster::FutureExt;
-use shady::Shady;
+use shady::{Shady, WgslFrontend};
 use wgpu::{
     Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, TextureViewDescriptor,
 };
@@ -23,7 +23,10 @@ struct State<'a> {
     config: SurfaceConfiguration,
     window: Arc<Window>,
     // SHADY
-    shady: Shady,
+    shady: Shady<WgslFrontend>,
+
+    vbuffer: wgpu::Buffer,
+    ibuffer: wgpu::Buffer,
 }
 
 impl<'a> State<'a> {
@@ -52,6 +55,8 @@ impl<'a> State<'a> {
 
         // SHADY
         let shady = Shady::new(&device);
+        let vbuffer = shady::vertex_buffer(&device);
+        let ibuffer = shady::index_buffer(&device);
 
         let config = {
             let surface_caps = surface.get_capabilities(&adapter);
@@ -83,6 +88,8 @@ impl<'a> State<'a> {
             config,
             window,
             shady,
+            vbuffer,
+            ibuffer,
         }
     }
 
@@ -128,10 +135,10 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&pipeline);
 
             // SHADY
-            render_pass.set_bind_group(0, self.shady.bind_group(), &[]);
-            render_pass.set_vertex_buffer(0, self.shady.vbuffer.slice(..));
-            render_pass.set_index_buffer(self.shady.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(self.shady.ibuffer_range(), 0, 0..1);
+            render_pass.set_bind_group(0, &self.shady.bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vbuffer.slice(..));
+            render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(shady::index_buffer_range(), 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -145,7 +152,7 @@ impl<'a> State<'a> {
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         // SHADY
         self.shady
-            .update_resolution(new_size.width as f32, new_size.height as f32);
+            .update_resolution(new_size.width, new_size.height);
     }
 
     pub fn cleanup(&mut self) {
