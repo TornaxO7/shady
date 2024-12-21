@@ -57,6 +57,7 @@ impl Uniforms {
     pub fn update_buffers(&mut self, queue: &mut wgpu::Queue) {
         self.time.update_buffer(queue);
         self.resolution.update_buffer(queue);
+
         #[cfg(feature = "audio")]
         self.audio.update_buffer(queue);
     }
