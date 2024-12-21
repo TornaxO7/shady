@@ -37,6 +37,9 @@
 
               sonic-visualiser
               wgpu-utils
+
+              nvtopPackages.amd
+              nvtopPackages.intel
             ];
           in
           {
