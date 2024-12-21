@@ -34,7 +34,7 @@ impl Uniform for Time {
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
         let elapsed_time = self.time.elapsed().as_secs_f32();
 
-        queue.write_buffer(self.buffer(), 0, &elapsed_time.to_ne_bytes());
+        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&[elapsed_time]));
     }
 
     fn cleanup(&mut self) {}

@@ -41,7 +41,7 @@ impl<F: Frontend> Shady<F> {
         let bind_group = uniforms.bind_group(device);
 
         Self {
-            uniforms: Uniforms::new(device),
+            uniforms,
             bind_group,
             frontend: F::new(),
         }
