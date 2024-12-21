@@ -4,8 +4,7 @@ layout(binding = 0) uniform float iTime;
 
 // x: width
 // y: height
-// z: aspect ratio (width / height)
-layout(binding = 1) uniform vec3 iResolution;
+layout(binding = 1) uniform vec2 iResolution;
 
 // x: bass
 // y: mid

@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::Result;
 use ariadne::Fmt;
-use frontend::Frontend;
+use frontend::ShaderLanguage;
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use renderer::Renderer;
 use tracing::{debug, debug_span};
@@ -62,7 +62,7 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    let frontend = Frontend::try_from(args.fragment_path.as_path())
+    let frontend = ShaderLanguage::try_from(args.fragment_path.as_path())
         .map_err(|err| Error::UnknownShaderFileExtension(err))?;
 
     println!(
@@ -73,7 +73,7 @@ fn main() -> Result<()> {
     start_app(args.fragment_path, frontend)
 }
 
-fn start_app(fragment_path: PathBuf, frontend: Frontend) -> Result<()> {
+fn start_app(fragment_path: PathBuf, frontend: ShaderLanguage) -> Result<()> {
     let event_loop = EventLoop::<UserEvent>::with_user_event()
         .build()
         .expect("Create window eventloop");
@@ -86,8 +86,16 @@ fn start_app(fragment_path: PathBuf, frontend: Frontend) -> Result<()> {
         move || watch_shader_file(path, proxy)
     });
 
-    let mut renderer = Renderer::new(fragment_path, frontend)?;
-    event_loop.run_app(&mut renderer)?;
+    match frontend {
+        ShaderLanguage::Wgsl => {
+            let mut renderer = Renderer::<shady::WgslFrontend>::new(fragment_path)?;
+            event_loop.run_app(&mut renderer)?;
+        }
+        ShaderLanguage::Glsl => {
+            let mut renderer = Renderer::<shady::GlslFrontend>::new(fragment_path)?;
+            event_loop.run_app(&mut renderer)?;
+        }
+    }
 
     Ok(())
 }
@@ -124,11 +132,11 @@ fn watch_shader_file<P: AsRef<Path>>(path: P, proxy: Arc<EventLoopProxy<UserEven
 }
 
 fn add_template_to_file(path: &Path) -> Result<(), String> {
-    let frontend = Frontend::try_from(path)?;
+    let frontend = ShaderLanguage::try_from(path)?;
 
     match frontend {
-        Frontend::Wgsl => std::fs::write(path, WGSL_TEMPLATE),
-        Frontend::Glsl => std::fs::write(path, GLSL_TEMPLATE),
+        ShaderLanguage::Wgsl => std::fs::write(path, WGSL_TEMPLATE),
+        ShaderLanguage::Glsl => std::fs::write(path, GLSL_TEMPLATE),
     }
     .expect("Write template to given path");
 

@@ -1,14 +1,11 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fs::File, io::Read, path::PathBuf, sync::Arc};
 
 use ariadne::{Color, Fmt, Label, Report, Source};
 use pollster::FutureExt;
-use shady::Shady;
-use tracing::warn;
+use shady::{Frontend, Shady};
+use tracing::{trace, warn};
 use wgpu::{
-    Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, SurfaceError,
+    Backends, Device, Instance, Queue, RenderPipeline, Surface, SurfaceConfiguration, SurfaceError,
     TextureViewDescriptor,
 };
 use winit::{
@@ -19,7 +16,7 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::{frontend::Frontend, UserEvent};
+use crate::UserEvent;
 
 #[derive(thiserror::Error, Debug)]
 enum RenderError {
@@ -27,20 +24,22 @@ enum RenderError {
     SurfaceError(#[from] SurfaceError),
 
     #[error(transparent)]
-    Shady(#[from] shady::Error),
+    IO(#[from] std::io::Error),
 }
 
-struct State<'a> {
+struct State<'a, F: Frontend> {
     surface: Surface<'a>,
     device: Device,
     queue: Queue,
     config: SurfaceConfiguration,
     window: Arc<Window>,
-    shady: Shady,
+    shady: Shady<F>,
+    pipeline: RenderPipeline,
 }
 
-impl<'a> State<'a> {
-    fn new(window: Window) -> Self {
+impl<'a, F: Frontend> State<'a, F> {
+    fn new(window: Window, fragment_code: &str) -> Result<Self, shady::Error> {
+        trace!("Create new state with fragment code:\n{}", fragment_code);
         let window = Arc::new(window);
 
         let instance = Instance::new(wgpu::InstanceDescriptor {
@@ -65,7 +64,7 @@ impl<'a> State<'a> {
             .block_on()
             .expect("Retrieve device and queue");
 
-        let shady = Shady::new(&device);
+        let mut shady = Shady::new();
 
         let config = {
             let surface_caps = surface.get_capabilities(&adapter);
@@ -90,43 +89,26 @@ impl<'a> State<'a> {
             }
         };
 
-        Self {
+        let pipeline = shady.get_render_pipeline(&device, fragment_code, &config.format)?;
+
+        Ok(Self {
             surface,
             device,
             queue,
             config,
             window,
             shady,
-        }
+            pipeline,
+        })
     }
 
     pub fn prepare_next_frame(&mut self) {
-        self.shady.update_buffers(&mut self.queue);
+        self.shady.update_buffers(&mut self.queue, &self.device);
 
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn render<P: AsRef<Path>>(
-        &mut self,
-        fragment_path: P,
-        frontend: Frontend,
-    ) -> Result<(), RenderError> {
-        let pipeline = {
-            let fragment_shader =
-                std::fs::read_to_string(fragment_path.as_ref()).expect("Read fragment shader");
-
-            match frontend {
-                Frontend::Wgsl => {
-                    self.shady
-                        .get_wgsl_pipeline(&self.device, fragment_shader, &self.config.format)
-                }
-                Frontend::Glsl => {
-                    self.shady
-                        .get_glsl_pipeline(&self.device, fragment_shader, &self.config.format)
-                }
-            }
-        }?;
-
+    pub fn render(&mut self) -> Result<(), RenderError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -152,11 +134,14 @@ impl<'a> State<'a> {
                 ..Default::default()
             });
 
-            render_pass.set_pipeline(&pipeline);
-            render_pass.set_bind_group(0, self.shady.bind_group(), &[]);
-            render_pass.set_vertex_buffer(0, self.shady.vbuffer.slice(..));
-            render_pass.set_index_buffer(self.shady.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(self.shady.ibuffer_range(), 0, 0..1);
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_bind_group(0, &shady::bind_group(&self.device), &[]);
+            render_pass.set_vertex_buffer(0, shady::vertex_buffer(&self.device).slice(..));
+            render_pass.set_index_buffer(
+                shady::index_buffer(&self.device).slice(..),
+                wgpu::IndexFormat::Uint16,
+            );
+            render_pass.draw_indexed(shady::index_buffer_range(), 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -176,32 +161,59 @@ impl<'a> State<'a> {
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.shady
-                .update_resolution(new_size.width as f32, new_size.height as f32);
+                .update_resolution(new_size.width, new_size.height);
             self.config.width = new_size.width;
             self.config.height = new_size.height;
         }
     }
+
+    pub fn update_pipeline(&mut self, fragment_code: &str) -> Result<(), shady::Error> {
+        self.pipeline =
+            self.shady
+                .get_render_pipeline(&self.device, fragment_code, &self.config.format)?;
+
+        Ok(())
+    }
 }
 
-pub struct Renderer<'a> {
-    state: Option<State<'a>>,
-    fragment_path: PathBuf,
+pub struct Renderer<'a, F: Frontend> {
+    state: Option<State<'a, F>>,
     display_error: bool,
 
-    frontend: Frontend,
+    fragment_path: PathBuf,
+    fragment_code: String,
 }
 
-impl<'a> Renderer<'a> {
-    pub fn new(fragment_path: PathBuf, frontend: Frontend) -> anyhow::Result<Self> {
-        Ok(Self {
+impl<'a, F: Frontend> Renderer<'a, F> {
+    pub fn new(fragment_path: PathBuf) -> anyhow::Result<Self> {
+        let mut renderer = Self {
             state: None,
-            fragment_path,
             display_error: true,
-            frontend,
-        })
+            fragment_path,
+            fragment_code: String::new(),
+        };
+
+        renderer.refresh_fragment_code()?;
+        Ok(renderer)
     }
 
-    fn print_error(&self, err: shady::Error) {
+    fn refresh_fragment_code(&mut self) -> Result<(), RenderError> {
+        self.display_error = true;
+
+        let mut file = File::open(&self.fragment_path)?;
+        file.read_to_string(&mut self.fragment_code)?;
+
+        if let Some(state) = &mut self.state {
+            if let Err(err) = state.update_pipeline(&self.fragment_code) {
+                self.print_shady_error(err);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn print_shady_error(&mut self, err: shady::Error) {
+        self.display_error = false;
         match err {
             shady::Error::InvalidWgslFragmentShader {
                 msg,
@@ -232,13 +244,16 @@ impl<'a> Renderer<'a> {
     }
 }
 
-impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
+impl<'a, F: Frontend> ApplicationHandler<UserEvent> for Renderer<'a, F> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = event_loop
             .create_window(WindowAttributes::default())
             .unwrap();
 
-        self.state = Some(State::new(window));
+        match State::<F>::new(window, &self.fragment_code) {
+            Ok(state) => self.state = Some(state),
+            Err(err) => self.print_shady_error(err),
+        }
     }
 
     fn window_event(
@@ -256,7 +271,7 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
                 window.request_redraw();
                 state.prepare_next_frame();
 
-                match state.render(&self.fragment_path, self.frontend) {
+                match state.render() {
                     Ok(_) => {
                         if !self.display_error {
                             println!("[{}] Everything clear", "OK".fg(Color::Green));
@@ -268,12 +283,6 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
                     }
                     Err(RenderError::SurfaceError(SurfaceError::Timeout)) => {
                         warn!("A frame took too long to be present");
-                    }
-                    Err(RenderError::Shady(err)) => {
-                        if self.display_error {
-                            self.display_error = false;
-                            self.print_error(err);
-                        }
                     }
                     Err(err) => warn!("{}", err),
                 }
@@ -295,10 +304,9 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: UserEvent) {
         match event {
             UserEvent::UpdatePath => {
-                if let Some(state) = &mut self.state {
-                    state.prepare_next_frame();
+                if let Err(err) = self.refresh_fragment_code() {
+                    eprintln!("Couldn't refresh fragment code: {}", err);
                 }
-                self.display_error = true;
             }
         }
     }

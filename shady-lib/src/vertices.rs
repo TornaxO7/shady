@@ -1,3 +1,6 @@
+use std::ops::Range;
+
+use tracing::instrument;
 use wgpu::util::DeviceExt;
 
 type VertexCoord = [f32; 2];
@@ -32,7 +35,8 @@ pub const BUFFER_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferL
     }],
 };
 
-pub fn get_vertex_buffer(device: &wgpu::Device) -> wgpu::Buffer {
+#[instrument(level = "trace")]
+pub fn vertex_buffer(device: &wgpu::Device) -> wgpu::Buffer {
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Shady Vertex Buffer"),
         contents: bytemuck::cast_slice(VERTICES),
@@ -40,10 +44,15 @@ pub fn get_vertex_buffer(device: &wgpu::Device) -> wgpu::Buffer {
     })
 }
 
-pub fn get_index_buffer(device: &wgpu::Device) -> wgpu::Buffer {
+#[instrument(level = "trace")]
+pub fn index_buffer(device: &wgpu::Device) -> wgpu::Buffer {
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Shady Index Buffer"),
         contents: bytemuck::cast_slice(INDICES),
         usage: wgpu::BufferUsages::INDEX,
     })
+}
+
+pub const fn index_buffer_range() -> Range<u32> {
+    0..INDICES.len() as u32
 }

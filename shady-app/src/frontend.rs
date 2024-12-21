@@ -4,12 +4,12 @@ const WGSL_EXTENSION: &str = "wgsl";
 const GLSL_EXTENSION: &str = "glsl";
 
 #[derive(Debug, Clone, Copy)]
-pub enum Frontend {
+pub enum ShaderLanguage {
     Wgsl,
     Glsl,
 }
 
-impl TryFrom<&Path> for Frontend {
+impl TryFrom<&Path> for ShaderLanguage {
     type Error = String;
 
     fn try_from(path: &Path) -> Result<Self, Self::Error> {

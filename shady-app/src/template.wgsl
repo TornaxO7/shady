@@ -3,9 +3,8 @@ var<uniform> iTime: f32;
 
 // x: width
 // y: height
-// z: aspect ratio (width / height)
 @group(0) @binding(1)
-var<uniform> iResolution: vec3<f32>;
+var<uniform> iResolution: vec2<f32>;
 
 // x: bass
 // y: mid

@@ -2,11 +2,14 @@ mod frontend;
 mod uniforms;
 mod vertices;
 
-use std::{borrow::Cow, ops::Range};
-
-use frontend::{Frontend, GlslFrontend, WgslFrontend};
+use std::borrow::Cow;
+use tracing::instrument;
 use uniforms::Uniforms;
-use wgpu::{naga::Module, Device};
+use wgpu::Device;
+
+pub use frontend::{Frontend, GlslFrontend, WgslFrontend};
+pub use uniforms::bind_group;
+pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -24,110 +27,54 @@ pub enum Error {
     InvalidGlslFragmentShader(String),
 }
 
-pub struct Shady {
-    pub vbuffer: wgpu::Buffer,
-    pub ibuffer: wgpu::Buffer,
+pub struct Shady<F: Frontend> {
     uniforms: Uniforms,
-
-    wgsl_frontend: WgslFrontend,
-    glsl_frontend: GlslFrontend,
+    frontend: F,
 }
 
-impl Shady {
-    pub fn new(device: &Device) -> Self {
+// General functions
+impl<F: Frontend> Shady<F> {
+    #[instrument(level = "trace")]
+    pub fn new() -> Self {
         Self {
-            vbuffer: vertices::get_vertex_buffer(device),
-            ibuffer: vertices::get_index_buffer(device),
-            uniforms: Uniforms::new(device),
-
-            wgsl_frontend: WgslFrontend::new(),
-            glsl_frontend: GlslFrontend::new(),
+            uniforms: Uniforms::new(),
+            frontend: F::new(),
         }
     }
 
-    pub fn ibuffer_range(&self) -> Range<u32> {
-        0..vertices::INDICES.len() as u32
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.uniforms.bind.group
-    }
-
-    pub fn update_resolution(&mut self, width: f32, height: f32) {
-        self.uniforms.data.update_resolution(width, height);
-    }
-
+    #[instrument(skip_all, level = "trace")]
     pub fn cleanup(&mut self) {
-        self.uniforms.data.audio.cleanup();
+        self.uniforms.cleanup();
     }
 
-    pub fn update_buffers(&self, queue: &mut wgpu::Queue) {
-        queue.write_buffer(
-            &self.uniforms.buffers.i_time,
-            0,
-            bytemuck::cast_slice(&[self.uniforms.data.i_time.elapsed().as_secs_f32()]),
-        );
-
-        queue.write_buffer(
-            &self.uniforms.buffers.i_resolution,
-            0,
-            bytemuck::cast_slice(&self.uniforms.data.i_resolution),
-        );
-
-        queue.write_buffer(
-            &self.uniforms.buffers.i_audio,
-            0,
-            bytemuck::cast_slice(&self.uniforms.data.audio.data()),
-        );
-    }
-
-    pub fn get_wgsl_pipeline<S: AsRef<str>>(
+    #[instrument(skip(self, device, fragment_shader), level = "trace")]
+    pub fn get_render_pipeline<S: AsRef<str>>(
         &mut self,
         device: &Device,
         fragment_shader: S,
         texture_format: &wgpu::TextureFormat,
     ) -> Result<wgpu::RenderPipeline, Error> {
-        let source = fragment_shader.as_ref();
-        let fragment_module = self.wgsl_frontend.parse(source)?;
-
-        Ok(self.get_render_pipeline(device, fragment_module, texture_format))
-    }
-
-    pub fn get_glsl_pipeline<S: AsRef<str>>(
-        &mut self,
-        device: &Device,
-        fragment_shader: S,
-        texture_format: &wgpu::TextureFormat,
-    ) -> Result<wgpu::RenderPipeline, Error> {
-        let source = fragment_shader.as_ref();
-        let fragment_module = self.glsl_frontend.parse(source)?;
-
-        Ok(self.get_render_pipeline(device, fragment_module, texture_format))
-    }
-
-    fn get_render_pipeline(
-        &mut self,
-        device: &Device,
-        fragment_module: Module,
-        texture_format: &wgpu::TextureFormat,
-    ) -> wgpu::RenderPipeline {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shady vertex shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-        let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shady fragment shader"),
-            source: wgpu::ShaderSource::Naga(Cow::Owned(fragment_module)),
-        });
+        let fragment_shader = {
+            let fragment_module = self.frontend.parse(fragment_shader.as_ref())?;
+
+            device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Shady fragment shader"),
+                source: wgpu::ShaderSource::Naga(Cow::Owned(fragment_module)),
+            })
+        };
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shady pipeline layout"),
-            bind_group_layouts: &[&self.uniforms.bind.layout],
+            bind_group_layouts: &[&uniforms::bind_group_layout(device)],
             push_constant_ranges: &[],
         });
 
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Shady render pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
@@ -163,6 +110,19 @@ impl Shady {
             }),
             multiview: None,
             cache: None,
-        })
+        });
+
+        Ok(pipeline)
+    }
+}
+
+/// Updating functions
+impl<F: Frontend> Shady<F> {
+    pub fn update_resolution(&mut self, width: u32, height: u32) {
+        self.uniforms.resolution.update_resolution(width, height);
+    }
+
+    pub fn update_buffers(&self, queue: &mut wgpu::Queue, device: &Device) {
+        self.uniforms.update_buffers(queue, device);
     }
 }

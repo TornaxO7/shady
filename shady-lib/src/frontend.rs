@@ -1,18 +1,28 @@
+use tracing::instrument;
 use wgpu::naga::{front::glsl::Options, ShaderStage};
 
 pub trait Frontend {
+    fn new() -> Self;
+
     fn parse(&mut self, fragment_shader: &str) -> Result<wgpu::naga::Module, crate::Error>;
 }
 
 pub struct WgslFrontend(wgpu::naga::front::wgsl::Frontend);
 
 impl WgslFrontend {
+    #[instrument(level = "trace")]
     pub fn new() -> Self {
         Self(wgpu::naga::front::wgsl::Frontend::new())
     }
 }
 
 impl Frontend for WgslFrontend {
+    #[instrument(level = "trace")]
+    fn new() -> Self {
+        Self::new()
+    }
+
+    #[instrument(skip(self), level = "trace")]
     fn parse(&mut self, fragment_shader: &str) -> Result<wgpu::naga::Module, crate::Error> {
         self.0.parse(fragment_shader).map_err(|err| {
             let msg = err.message().to_string();
@@ -33,12 +43,19 @@ impl Frontend for WgslFrontend {
 pub struct GlslFrontend(wgpu::naga::front::glsl::Frontend);
 
 impl GlslFrontend {
+    #[instrument(level = "trace")]
     pub fn new() -> Self {
         Self(wgpu::naga::front::glsl::Frontend::default())
     }
 }
 
 impl Frontend for GlslFrontend {
+    #[instrument(level = "trace")]
+    fn new() -> Self {
+        Self::new()
+    }
+
+    #[instrument(skip(self), level = "trace")]
     fn parse(&mut self, fragment_shader: &str) -> Result<wgpu::naga::Module, crate::Error> {
         let parse_options = Options::from(ShaderStage::Fragment);
 

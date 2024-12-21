@@ -6,18 +6,41 @@ use cpal::{
 };
 use realfft::{num_complex::Complex32, RealFftPlanner};
 
+use super::Uniform;
+
 const AUDIO_BUFFER_SIZE: usize = 3;
 
-pub struct AudioData {
-    i_audio: Arc<Mutex<[f32; AUDIO_BUFFER_SIZE]>>,
+pub struct Audio {
+    data: Arc<Mutex<[f32; AUDIO_BUFFER_SIZE]>>,
     stream: Stream,
     _fft: Arc<Mutex<FftWrapper>>,
 }
 
-impl AudioData {
+impl Uniform for Audio {
+    type BufferDataType = [f32; AUDIO_BUFFER_SIZE];
+
+    fn buffer_label() -> &'static str {
+        "Shady iAudio buffer"
+    }
+
+    fn binding() -> u32 {
+        2
+    }
+
+    fn update_buffer(&self, queue: &mut wgpu::Queue, device: &wgpu::Device) {
+        let data = self.data.lock().unwrap();
+        queue.write_buffer(&Self::buffer(device), 0, bytemuck::cast_slice(&*data));
+    }
+
+    fn cleanup(&mut self) {
+        self.stream.pause().expect("Close audio stream");
+    }
+}
+
+impl Audio {
     pub fn new() -> Self {
         let fft = Arc::new(Mutex::new(FftWrapper::new()));
-        let i_audio = Arc::new(Mutex::new([0f32; AUDIO_BUFFER_SIZE]));
+        let data = Arc::new(Mutex::new([0f32; AUDIO_BUFFER_SIZE]));
 
         let stream = {
             let host = cpal::default_host();
@@ -37,7 +60,7 @@ impl AudioData {
                     {
                         let sample_rate = config.sample_rate;
                         let fft_clone = fft.clone();
-                        let i_audio_clone = i_audio.clone();
+                        let data_clone = data.clone();
 
                         move |data: &[f32], _: &cpal::InputCallbackInfo| {
                             let data_len = data.len();
@@ -48,10 +71,10 @@ impl AudioData {
                             let (bass, mid, treble) =
                                 split_audio(fourier_output, data_len, sample_rate);
 
-                            let mut i_audio = i_audio_clone.lock().unwrap();
-                            i_audio[0] = average(&bass);
-                            i_audio[1] = average(&mid);
-                            i_audio[2] = average(&treble);
+                            let mut uniform_data = data_clone.lock().unwrap();
+                            uniform_data[0] = average(&bass);
+                            uniform_data[1] = average(&mid);
+                            uniform_data[2] = average(&treble);
                         }
                     },
                     move |err| {
@@ -65,20 +88,10 @@ impl AudioData {
         stream.play().unwrap();
 
         Self {
-            i_audio,
+            data,
             stream,
             _fft: fft,
         }
-    }
-
-    pub fn data(&self) -> [f32; AUDIO_BUFFER_SIZE] {
-        let mut buffer = [0f32; AUDIO_BUFFER_SIZE];
-        buffer.copy_from_slice(&*self.i_audio.lock().unwrap());
-        buffer
-    }
-
-    pub fn cleanup(&mut self) {
-        self.stream.pause().expect("Cleanup audio stream");
     }
 }
 
