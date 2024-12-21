@@ -1,4 +1,5 @@
 mod cli;
+mod frontend;
 mod logger;
 mod renderer;
 
@@ -9,6 +10,7 @@ use std::{
 
 use anyhow::Result;
 use ariadne::Fmt;
+use frontend::Frontend;
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use renderer::Renderer;
 use tracing::{debug, debug_span};
@@ -17,7 +19,8 @@ use winit::{
     event_loop::{ControlFlow, EventLoop, EventLoopProxy},
 };
 
-pub const SHADER_TEMPLATE: &str = include_str!("template.wgsl");
+pub const WGSL_TEMPLATE: &str = include_str!("template.wgsl");
+pub const GLSL_TEMPLATE: &str = include_str!("template.glsl");
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -32,6 +35,9 @@ pub enum Error {
 
     #[error(transparent)]
     FileWatcher(#[from] notify::Error),
+
+    #[error("{0}")]
+    UnknownShaderFileExtension(String),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,7 +50,8 @@ fn main() -> Result<()> {
     let args = cli::parse();
 
     if args.template {
-        add_template_to_file(&args.fragment_path);
+        add_template_to_file(&args.fragment_path)
+            .map_err(|err| Error::UnknownShaderFileExtension(err))?;
     }
 
     if !std::fs::exists(&args.fragment_path).expect("Check if fragment file exists") {
@@ -55,14 +62,18 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
+    let frontend = Frontend::try_from(args.fragment_path.as_path())
+        .map_err(|err| Error::UnknownShaderFileExtension(err))?;
+
     println!(
         "[{}]: Press `q` in the shader-window to exit.",
         "NOTE".fg(ariadne::Color::Cyan)
     );
-    start_app(args.fragment_path)
+
+    start_app(args.fragment_path, frontend)
 }
 
-fn start_app(fragment_path: PathBuf) -> Result<()> {
+fn start_app(fragment_path: PathBuf, frontend: Frontend) -> Result<()> {
     let event_loop = EventLoop::<UserEvent>::with_user_event()
         .build()
         .expect("Create window eventloop");
@@ -75,7 +86,7 @@ fn start_app(fragment_path: PathBuf) -> Result<()> {
         move || watch_shader_file(path, proxy)
     });
 
-    let mut renderer = Renderer::new(fragment_path);
+    let mut renderer = Renderer::new(fragment_path, frontend)?;
     event_loop.run_app(&mut renderer)?;
 
     Ok(())
@@ -112,6 +123,14 @@ fn watch_shader_file<P: AsRef<Path>>(path: P, proxy: Arc<EventLoopProxy<UserEven
     Ok(())
 }
 
-fn add_template_to_file(path: &Path) {
-    std::fs::write(path, SHADER_TEMPLATE).expect("Write template to given path");
+fn add_template_to_file(path: &Path) -> Result<(), String> {
+    let frontend = Frontend::try_from(path)?;
+
+    match frontend {
+        Frontend::Wgsl => std::fs::write(path, WGSL_TEMPLATE),
+        Frontend::Glsl => std::fs::write(path, GLSL_TEMPLATE),
+    }
+    .expect("Write template to given path");
+
+    Ok(())
 }

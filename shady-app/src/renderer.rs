@@ -19,7 +19,7 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::UserEvent;
+use crate::{frontend::Frontend, UserEvent};
 
 #[derive(thiserror::Error, Debug)]
 enum RenderError {
@@ -106,13 +106,25 @@ impl<'a> State<'a> {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn render<P: AsRef<Path>>(&mut self, fragment_path: P) -> Result<(), RenderError> {
+    pub fn render<P: AsRef<Path>>(
+        &mut self,
+        fragment_path: P,
+        frontend: Frontend,
+    ) -> Result<(), RenderError> {
         let pipeline = {
             let fragment_shader =
                 std::fs::read_to_string(fragment_path.as_ref()).expect("Read fragment shader");
 
-            self.shady
-                .get_render_pipeline(&self.device, fragment_shader, &self.config.format)
+            match frontend {
+                Frontend::Wgsl => {
+                    self.shady
+                        .get_wgsl_pipeline(&self.device, fragment_shader, &self.config.format)
+                }
+                Frontend::Glsl => {
+                    self.shady
+                        .get_glsl_pipeline(&self.device, fragment_shader, &self.config.format)
+                }
+            }
         }?;
 
         let output = self.surface.get_current_texture()?;
@@ -175,15 +187,48 @@ pub struct Renderer<'a> {
     state: Option<State<'a>>,
     fragment_path: PathBuf,
     display_error: bool,
+
+    frontend: Frontend,
 }
 
 impl<'a> Renderer<'a> {
-    pub fn new(fragment_path: PathBuf) -> Self {
-        Self {
+    pub fn new(fragment_path: PathBuf, frontend: Frontend) -> anyhow::Result<Self> {
+        Ok(Self {
             state: None,
             fragment_path,
             display_error: true,
-        }
+            frontend,
+        })
+    }
+
+    fn print_error(&self, err: shady::Error) {
+        match err {
+            shady::Error::InvalidWgslFragmentShader {
+                msg,
+                fragment_code,
+                offset,
+                length,
+                ..
+            } => {
+                Report::build(
+                    ariadne::ReportKind::Error,
+                    offset as usize..(offset + length) as usize,
+                )
+                .with_message("Invalid fragment shader")
+                .with_label(
+                    Label::new(offset as usize..(offset + length) as usize)
+                        .with_message(msg.fg(ariadne::Color::Blue))
+                        .with_color(ariadne::Color::Blue),
+                )
+                .finish()
+                .print(Source::from(fragment_code))
+                .unwrap();
+            }
+
+            shady::Error::InvalidGlslFragmentShader(msg) => {
+                eprintln!("{}", msg);
+            }
+        };
     }
 }
 
@@ -211,7 +256,7 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
                 window.request_redraw();
                 state.prepare_next_frame();
 
-                match state.render(&self.fragment_path) {
+                match state.render(&self.fragment_path, self.frontend) {
                     Ok(_) => {
                         if !self.display_error {
                             println!("[{}] Everything clear", "OK".fg(Color::Green));
@@ -227,27 +272,7 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
                     Err(RenderError::Shady(err)) => {
                         if self.display_error {
                             self.display_error = false;
-                            match err {
-                                shady::Error::InvalidFragmentShader {
-                                    msg,
-                                    fragment_code,
-                                    offset,
-                                    length,
-                                    ..
-                                } => Report::build(
-                                    ariadne::ReportKind::Error,
-                                    offset as usize..(offset + length) as usize,
-                                )
-                                .with_message("Invalid fragment shader")
-                                .with_label(
-                                    Label::new(offset as usize..(offset + length) as usize)
-                                        .with_message(msg.fg(ariadne::Color::Blue))
-                                        .with_color(ariadne::Color::Blue),
-                                )
-                                .finish()
-                                .print(Source::from(fragment_code))
-                                .unwrap(),
-                            };
+                            self.print_error(err);
                         }
                     }
                     Err(err) => warn!("{}", err),

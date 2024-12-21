@@ -3,6 +3,10 @@ members = ["shady-lib", "shady-app"]
 resolver = "2"
 
 [workspace.dependencies]
-wgpu = "22.0"
+wgpu = { version = "22.0", default-features = false, features = [
+  "naga-ir",
+  "wgsl",
+  "glsl",
+] }
 tracing = "0.1"
 thiserror = "2"

@@ -1,15 +1,17 @@
+mod frontend;
 mod uniforms;
 mod vertices;
 
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
+use frontend::{Frontend, GlslFrontend, WgslFrontend};
 use uniforms::Uniforms;
-use wgpu::Device;
+use wgpu::{naga::Module, Device};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Invalid fragment shader in line {line_num}, column {line_pos}: {msg}")]
-    InvalidFragmentShader {
+    InvalidWgslFragmentShader {
         fragment_code: String,
         msg: String,
         line_num: u32,
@@ -17,12 +19,18 @@ pub enum Error {
         offset: u32,
         length: u32,
     },
+
+    #[error("Invalid fragment shader: {0}")]
+    InvalidGlslFragmentShader(String),
 }
 
 pub struct Shady {
     pub vbuffer: wgpu::Buffer,
     pub ibuffer: wgpu::Buffer,
     uniforms: Uniforms,
+
+    wgsl_frontend: WgslFrontend,
+    glsl_frontend: GlslFrontend,
 }
 
 impl Shady {
@@ -31,6 +39,9 @@ impl Shady {
             vbuffer: vertices::get_vertex_buffer(device),
             ibuffer: vertices::get_index_buffer(device),
             uniforms: Uniforms::new(device),
+
+            wgsl_frontend: WgslFrontend::new(),
+            glsl_frontend: GlslFrontend::new(),
         }
     }
 
@@ -70,34 +81,44 @@ impl Shady {
         );
     }
 
-    pub fn get_render_pipeline<S: AsRef<str>>(
-        &self,
+    pub fn get_wgsl_pipeline<S: AsRef<str>>(
+        &mut self,
         device: &Device,
         fragment_shader: S,
         texture_format: &wgpu::TextureFormat,
     ) -> Result<wgpu::RenderPipeline, Error> {
+        let source = fragment_shader.as_ref();
+        let fragment_module = self.wgsl_frontend.parse(source)?;
+
+        Ok(self.get_render_pipeline(device, fragment_module, texture_format))
+    }
+
+    pub fn get_glsl_pipeline<S: AsRef<str>>(
+        &mut self,
+        device: &Device,
+        fragment_shader: S,
+        texture_format: &wgpu::TextureFormat,
+    ) -> Result<wgpu::RenderPipeline, Error> {
+        let source = fragment_shader.as_ref();
+        let fragment_module = self.glsl_frontend.parse(source)?;
+
+        Ok(self.get_render_pipeline(device, fragment_module, texture_format))
+    }
+
+    fn get_render_pipeline(
+        &mut self,
+        device: &Device,
+        fragment_module: Module,
+        texture_format: &wgpu::TextureFormat,
+    ) -> wgpu::RenderPipeline {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shady vertex shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-        // check if the fragment is valid
-        if let Err(err) = wgpu::naga::front::wgsl::parse_str(fragment_shader.as_ref()) {
-            let msg = err.message().to_string();
-            let location = err.location(fragment_shader.as_ref()).unwrap();
-
-            return Err(Error::InvalidFragmentShader {
-                msg,
-                fragment_code: fragment_shader.as_ref().to_string(),
-                line_num: location.line_number,
-                line_pos: location.line_position,
-                offset: location.offset,
-                length: location.length,
-            });
-        }
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shady fragment shader"),
-            source: wgpu::ShaderSource::Wgsl(fragment_shader.as_ref().into()),
+            source: wgpu::ShaderSource::Naga(Cow::Owned(fragment_module)),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -106,7 +127,7 @@ impl Shady {
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Shady render pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
@@ -142,8 +163,6 @@ impl Shady {
             }),
             multiview: None,
             cache: None,
-        });
-
-        Ok(pipeline)
+        })
     }
 }
