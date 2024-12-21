@@ -1,7 +1,9 @@
+#[cfg(feature = "audio")]
 mod audio;
 mod resolution;
 mod time;
 
+#[cfg(feature = "audio")]
 use audio::Audio;
 use resolution::Resolution;
 use time::Time;
@@ -36,6 +38,7 @@ pub trait Uniform {
 pub struct Uniforms {
     pub time: Time,
     pub resolution: Resolution,
+    #[cfg(feature = "audio")]
     pub audio: Audio,
 }
 
@@ -45,6 +48,7 @@ impl Uniforms {
         Self {
             time: Time::new(device),
             resolution: Resolution::new(device),
+            #[cfg(feature = "audio")]
             audio: Audio::new(device),
         }
     }
@@ -53,6 +57,7 @@ impl Uniforms {
     pub fn update_buffers(&mut self, queue: &mut wgpu::Queue) {
         self.time.update_buffer(queue);
         self.resolution.update_buffer(queue);
+        #[cfg(feature = "audio")]
         self.audio.update_buffer(queue);
     }
 
@@ -60,6 +65,7 @@ impl Uniforms {
     pub fn cleanup(&mut self) {
         self.time.cleanup();
         self.resolution.cleanup();
+        #[cfg(feature = "audio")]
         self.audio.cleanup();
     }
 }
@@ -72,6 +78,7 @@ impl Uniforms {
             entries: &[
                 bind_group_layout_entry(Time::binding()),
                 bind_group_layout_entry(Resolution::binding()),
+                #[cfg(feature = "audio")]
                 bind_group_layout_entry(Audio::binding()),
             ],
         })
@@ -93,6 +100,7 @@ impl Uniforms {
                     binding: Resolution::binding(),
                     resource: self.resolution.buffer().as_entire_binding(),
                 },
+                #[cfg(feature = "audio")]
                 wgpu::BindGroupEntry {
                     binding: Audio::binding(),
                     resource: self.audio.buffer().as_entire_binding(),

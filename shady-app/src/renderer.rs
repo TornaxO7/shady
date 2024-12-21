@@ -111,8 +111,6 @@ impl<'a, F: Frontend> State<'a, F> {
 
     pub fn prepare_next_frame(&mut self) {
         self.shady.update_buffers(&mut self.queue);
-
-        self.surface.configure(&self.device, &self.config);
     }
 
     pub fn render(&mut self) -> Result<(), RenderError> {
@@ -168,6 +166,7 @@ impl<'a, F: Frontend> State<'a, F> {
                 .update_resolution(new_size.width, new_size.height);
             self.config.width = new_size.width;
             self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config);
         }
     }
 

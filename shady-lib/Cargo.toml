@@ -14,3 +14,9 @@ bytemuck = { version = "1", features = ["derive"] }
 wgpu.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
+
+
+[features]
+default = []
+
+audio = []

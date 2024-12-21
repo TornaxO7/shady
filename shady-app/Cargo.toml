@@ -25,3 +25,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
 name = "octagrams"
+
+[features]
+default = []
+audio = ["shady/audio"]
