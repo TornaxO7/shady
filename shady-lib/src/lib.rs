@@ -77,7 +77,7 @@ impl<F: Frontend> Shady<F> {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shady pipeline layout"),
-            bind_group_layouts: &[&Uniforms::bind_group_layout(device)],
+            bind_group_layouts: &[&self.uniforms.bind_group_layout(device)],
             push_constant_ranges: &[],
         });
 

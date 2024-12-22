@@ -17,12 +17,13 @@ pub struct Audio {
     _fft: Arc<Mutex<FftWrapper>>,
 
     buffer: wgpu::Buffer,
+    binding: u32,
 }
 
 impl Uniform for Audio {
     type BufferDataType = [f32; AUDIO_BUFFER_SIZE];
 
-    fn new(device: &Device) -> Self {
+    fn new(device: &Device, binding: u32) -> Self {
         let fft = Arc::new(Mutex::new(FftWrapper::new()));
         let data = Arc::new(Mutex::new([0f32; AUDIO_BUFFER_SIZE]));
 
@@ -78,6 +79,7 @@ impl Uniform for Audio {
             stream,
             _fft: fft,
             buffer,
+            binding,
         }
     }
 
@@ -89,8 +91,8 @@ impl Uniform for Audio {
         &self.buffer
     }
 
-    fn binding() -> u32 {
-        2
+    fn binding(&self) -> u32 {
+        self.binding
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {

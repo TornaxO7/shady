@@ -3,6 +3,7 @@ use super::Uniform;
 pub struct Frame {
     value: u32,
 
+    binding: u32,
     buffer: wgpu::Buffer,
 }
 
@@ -19,14 +20,18 @@ impl Frame {
 impl Uniform for Frame {
     type BufferDataType = u32;
 
-    fn new(device: &wgpu::Device) -> Self {
+    fn new(device: &wgpu::Device, binding: u32) -> Self {
         let buffer = Self::create_buffer(device);
 
-        Self { value: 0, buffer }
+        Self {
+            value: 0,
+            buffer,
+            binding,
+        }
     }
 
-    fn binding() -> u32 {
-        4
+    fn binding(&self) -> u32 {
+        self.binding
     }
 
     fn buffer_label() -> &'static str {

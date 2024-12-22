@@ -8,6 +8,7 @@ pub struct Resolution {
     height: u32,
 
     buffer: wgpu::Buffer,
+    binding: u32,
 }
 
 impl Resolution {
@@ -22,13 +23,14 @@ impl Resolution {
 impl Uniform for Resolution {
     type BufferDataType = [f32; 2];
 
-    fn new(device: &Device) -> Self {
+    fn new(device: &Device, binding: u32) -> Self {
         let buffer = Self::create_buffer(device);
 
         Self {
             width: 0,
             height: 0,
             buffer,
+            binding,
         }
     }
 
@@ -36,8 +38,8 @@ impl Uniform for Resolution {
         "Shady iResolution buffer"
     }
 
-    fn binding() -> u32 {
-        1
+    fn binding(&self) -> u32 {
+        self.binding
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {

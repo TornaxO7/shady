@@ -9,17 +9,19 @@ pub struct Time {
     time: Instant,
 
     buffer: wgpu::Buffer,
+    binding: u32,
 }
 
 impl Uniform for Time {
     type BufferDataType = f32;
 
-    fn new(device: &Device) -> Self {
+    fn new(device: &Device, binding: u32) -> Self {
         let buffer = Self::create_buffer(device);
 
         Self {
             time: Instant::now(),
             buffer,
+            binding,
         }
     }
 
@@ -27,8 +29,8 @@ impl Uniform for Time {
         "Shady iTime buffer"
     }
 
-    fn binding() -> u32 {
-        0
+    fn binding(&self) -> u32 {
+        self.binding
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
