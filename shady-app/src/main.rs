@@ -1,6 +1,7 @@
 mod cli;
 mod frontend;
 mod logger;
+mod mouse;
 mod renderer;
 
 use std::{

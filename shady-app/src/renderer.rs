@@ -16,7 +16,7 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-use crate::UserEvent;
+use crate::{mouse::Mouse, UserEvent};
 
 #[derive(thiserror::Error, Debug)]
 enum RenderError {
@@ -38,6 +38,7 @@ struct State<'a, F: Frontend> {
 
     vbuffer: wgpu::Buffer,
     ibuffer: wgpu::Buffer,
+    pub mouse: Mouse,
 }
 
 impl<'a, F: Frontend> State<'a, F> {
@@ -106,6 +107,7 @@ impl<'a, F: Frontend> State<'a, F> {
             pipeline,
             vbuffer,
             ibuffer,
+            mouse: Mouse::new(),
         })
     }
 
@@ -296,6 +298,23 @@ impl<'a, F: Frontend> ApplicationHandler<UserEvent> for Renderer<'a, F> {
                 }
             }
             WindowEvent::Resized(new_size) => state.resize(new_size),
+            WindowEvent::MouseInput {
+                state: mouse_state, ..
+            } => {
+                state.mouse.mouse_input(mouse_state);
+
+                if state.mouse.is_pressed() {
+                    let pos = state.mouse.pos();
+                    state.shady.update_mouse_pressed(pos.x, pos.y);
+
+                    if state.mouse.was_pressed() {
+                        state.shady.update_mouse_released(pos.x, pos.y);
+                    }
+                } else {
+                    state.shady.update_mouse_released(0., 0.);
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => state.mouse.cursor_moved(position),
             WindowEvent::KeyboardInput { event, .. }
                 if event.logical_key.to_text() == Some("q") =>
             {

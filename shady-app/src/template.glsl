@@ -11,8 +11,15 @@ layout(binding = 1) uniform vec2 iResolution;
 // z: treble
 layout(binding = 2) uniform vec3 iAudio;
 
+// x: x-coord when the mouse is pressed
+// y: y-coord when the mouse is pressed
+// z: x-coord when the mouse is released
+// w: y-coord when the mouse is released
+layout(binding = 3) uniform vec4 iMouse;
+
 layout(binding = 4) uniform uint iFrame;
 
+// the color which the pixel should have
 layout(location = 0) out vec4 fragColor;
 
 void main() {

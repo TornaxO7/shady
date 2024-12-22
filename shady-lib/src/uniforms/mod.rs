@@ -8,6 +8,7 @@ mod time;
 #[cfg(feature = "audio")]
 use audio::Audio;
 use frame::Frame;
+use mouse::Mouse;
 use resolution::Resolution;
 use time::Time;
 use tracing::instrument;
@@ -44,6 +45,7 @@ pub struct Uniforms {
     #[cfg(feature = "audio")]
     pub audio: Audio,
     pub frame: Frame,
+    pub mouse: Mouse,
 }
 
 impl Uniforms {
@@ -56,7 +58,8 @@ impl Uniforms {
             resolution: Resolution::new(device, INIT_BINDING + 1),
             #[cfg(feature = "audio")]
             audio: Audio::new(device, INIT_BINDING + 2),
-            frame: Frame::new(device, INIT_BINDING + 3),
+            mouse: Mouse::new(device, INIT_BINDING + 3),
+            frame: Frame::new(device, INIT_BINDING + 4),
         }
     }
 
@@ -68,6 +71,7 @@ impl Uniforms {
         #[cfg(feature = "audio")]
         self.audio.update_buffer(queue);
         self.frame.update_buffer(queue);
+        self.mouse.update_buffer(queue);
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -77,9 +81,11 @@ impl Uniforms {
         #[cfg(feature = "audio")]
         self.audio.cleanup();
         self.frame.cleanup();
+        self.mouse.cleanup();
     }
 }
 
+/// Methods regardin bind groups
 impl Uniforms {
     #[instrument(skip(self), level = "trace")]
     pub fn bind_group_layout(&self, device: &Device) -> wgpu::BindGroupLayout {
@@ -91,6 +97,7 @@ impl Uniforms {
                 #[cfg(feature = "audio")]
                 bind_group_layout_entry(self.audio.binding()),
                 bind_group_layout_entry(self.frame.binding()),
+                bind_group_layout_entry(self.mouse.binding()),
             ],
         })
     }
@@ -120,12 +127,15 @@ impl Uniforms {
                     binding: self.frame.binding(),
                     resource: self.frame.buffer().as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: self.mouse.binding(),
+                    resource: self.mouse.buffer().as_entire_binding(),
+                },
             ],
         })
     }
 }
 
-/// Methods regarding bind groups
 #[instrument(level = "trace")]
 fn bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {

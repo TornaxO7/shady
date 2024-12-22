@@ -129,6 +129,14 @@ impl<F: Frontend> Shady<F> {
         self.uniforms.resolution.update_resolution(width, height);
     }
 
+    pub fn update_mouse_pressed(&mut self, x: f32, y: f32) {
+        self.uniforms.mouse.pressed_coord(x, y);
+    }
+
+    pub fn update_mouse_released(&mut self, x: f32, y: f32) {
+        self.uniforms.mouse.released_coord(x, y);
+    }
+
     pub fn prepare_next_frame(&mut self, queue: &mut wgpu::Queue) {
         self.uniforms.frame.next_frame();
         self.uniforms.update_buffers(queue);

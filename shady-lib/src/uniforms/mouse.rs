@@ -14,6 +14,16 @@ pub struct Mouse {
     binding: u32,
 }
 
+impl Mouse {
+    pub fn pressed_coord(&mut self, x: f32, y: f32) {
+        self.pressed = Coord { x, y };
+    }
+
+    pub fn released_coord(&mut self, x: f32, y: f32) {
+        self.released = Coord { x, y }
+    }
+}
+
 impl Uniform for Mouse {
     type BufferDataType = [f32; 4];
 

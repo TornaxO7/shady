@@ -12,6 +12,13 @@ var<uniform> iResolution: vec2<f32>;
 @group(0) @binding(2)
 var<uniform> iAudio: vec3<f32>;
 
+// x: x-coord when the mouse is pressed
+// y: y-coord when the mouse is pressed
+// z: x-coord when the mouse is released
+// w: y-coord when the mouse is released
+@group(0) @binding(3)
+var<uniform> iMouse: vec4<f32>;
+
 @group(0) @binding(4)
 var<uniform> iFrame: u32;
 
