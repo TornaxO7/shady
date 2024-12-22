@@ -1,3 +1,5 @@
+use tracing::{debug, instrument};
+
 use super::Uniform;
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -6,7 +8,7 @@ struct Coord {
     pub y: f32,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseState {
     Pressed,
     Released,
@@ -24,16 +26,21 @@ pub struct Mouse {
 }
 
 impl Mouse {
+    #[instrument(skip(self), level = "trace")]
     pub fn cursor_moved(&mut self, x: f32, y: f32) {
         self.pos = Coord { x, y };
     }
 
+    #[instrument(skip(self), level = "trace")]
     pub fn mouse_input(&mut self, state: MouseState) {
+        self.prev_state = state;
         if state == MouseState::Pressed {
             self.curr_pos = self.pos;
+            debug!("Mouse curr pos: {:?}", self.curr_pos);
 
             if self.prev_state == MouseState::Released {
                 self.prev_pos = self.pos;
+                debug!("Mouse prev pos: {:?}", self.prev_pos);
             }
         } else {
             self.prev_pos = Coord::default();
