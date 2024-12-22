@@ -2,25 +2,42 @@ use super::Uniform;
 
 #[derive(Default, Debug, Clone, Copy)]
 struct Coord {
-    x: f32,
-    y: f32,
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum MouseState {
+    Pressed,
+    Released,
 }
 
 pub struct Mouse {
-    pressed: Coord,
-    released: Coord,
+    pos: Coord,
+
+    prev_state: MouseState,
+    prev_pos: Coord,
+    curr_pos: Coord,
 
     buffer: wgpu::Buffer,
     binding: u32,
 }
 
 impl Mouse {
-    pub fn pressed_coord(&mut self, x: f32, y: f32) {
-        self.pressed = Coord { x, y };
+    pub fn cursor_moved(&mut self, x: f32, y: f32) {
+        self.pos = Coord { x, y };
     }
 
-    pub fn released_coord(&mut self, x: f32, y: f32) {
-        self.released = Coord { x, y }
+    pub fn mouse_input(&mut self, state: MouseState) {
+        if state == MouseState::Pressed {
+            self.curr_pos = self.pos;
+
+            if self.prev_state == MouseState::Released {
+                self.prev_pos = self.pos;
+            }
+        } else {
+            self.prev_pos = Coord::default();
+        }
     }
 }
 
@@ -31,8 +48,10 @@ impl Uniform for Mouse {
         let buffer = Self::create_buffer(device);
 
         Self {
-            pressed: Coord::default(),
-            released: Coord::default(),
+            pos: Coord::default(),
+            prev_state: MouseState::Released,
+            prev_pos: Coord::default(),
+            curr_pos: Coord::default(),
 
             binding,
             buffer,
@@ -49,10 +68,10 @@ impl Uniform for Mouse {
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
         let data = [
-            self.pressed.x,
-            self.pressed.y,
-            self.released.x,
-            self.released.y,
+            self.curr_pos.x,
+            self.curr_pos.y,
+            self.prev_pos.x,
+            self.prev_pos.y,
         ];
 
         queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&data));

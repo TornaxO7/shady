@@ -14,6 +14,8 @@ use time::Time;
 use tracing::instrument;
 use wgpu::Device;
 
+pub use mouse::MouseState;
+
 pub trait Uniform {
     type BufferDataType;
 
