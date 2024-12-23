@@ -2101,6 +2101,7 @@ dependencies = [
  "bytemuck",
  "cpal",
  "realfft",
+ "shady-audio",
  "thiserror 2.0.8",
  "tracing",
  "wgpu",
