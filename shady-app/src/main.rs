@@ -50,8 +50,7 @@ fn main() -> Result<()> {
     let args = cli::parse();
 
     if args.template {
-        add_template_to_file(&args.fragment_path)
-            .map_err(|err| Error::UnknownShaderFileExtension(err))?;
+        add_template_to_file(&args.fragment_path).map_err(Error::UnknownShaderFileExtension)?;
     }
 
     if !std::fs::exists(&args.fragment_path).expect("Check if fragment file exists") {
@@ -63,7 +62,7 @@ fn main() -> Result<()> {
     }
 
     let frontend = ShaderLanguage::try_from(args.fragment_path.as_path())
-        .map_err(|err| Error::UnknownShaderFileExtension(err))?;
+        .map_err(Error::UnknownShaderFileExtension)?;
 
     println!(
         "[{}]: Press `q` in the shader-window to exit.",

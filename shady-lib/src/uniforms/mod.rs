@@ -33,7 +33,7 @@ pub trait Uniform {
 
     fn create_buffer(device: &Device) -> wgpu::Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some(&Self::buffer_label()),
+            label: Some(Self::buffer_label()),
             size: std::mem::size_of::<Self::BufferDataType>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -56,7 +56,7 @@ impl Uniforms {
         const INIT_BINDING: u32 = 0;
 
         Self {
-            time: Time::new(device, INIT_BINDING + 0),
+            time: Time::new(device, INIT_BINDING),
             resolution: Resolution::new(device, INIT_BINDING + 1),
             #[cfg(feature = "audio")]
             audio: Audio::new(device, INIT_BINDING + 2),
