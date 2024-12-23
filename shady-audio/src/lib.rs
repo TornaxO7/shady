@@ -1,3 +1,31 @@
+//! This crate takes care of catching audio and giving you the desired amount of magnitudes
+//! which are used for music visualizers for example.
+//!
+//! # Example
+//! This example basically contains the full API:
+//!
+//! ```no_run
+//! use std::num::NonZeroUsize;
+//!
+//! use shady_audio::ShadyAudio;
+//!
+//! fn main() {
+//!     // use the default output and the internal heuristic config
+//!     let mut audio = ShadyAudio::new(None, None, |err| panic!("{}", err));
+//!
+//!     // get the magnitudes with 10 entries
+//!     let magnitudes = audio.fetch_magnitudes(NonZeroUsize::new(10).unwrap());
+//!     assert_eq!(magnitudes.len(), 10);
+//!
+//!     // ... or in normalized form
+//!     let norm_magnitudes = audio.fetch_magnitudes_normalized(NonZeroUsize::new(10).unwrap());
+//!     for &norm_magn in norm_magnitudes {
+//!         assert!(0.0 <= norm_magn);
+//!         assert!(norm_magn <= 1.0);
+//!     }
+//!     assert_eq!(norm_magnitudes.len(), 10);
+//! }
+//! ```
 use std::{
     num::NonZeroUsize,
     sync::{Arc, Mutex, TryLockError},
@@ -12,32 +40,7 @@ use tracing::debug;
 
 const REQUIRED_SAMPLE_RATE: SampleRate = SampleRate(44_100); // unit: Hz, about audio stream quality
 
-/// The main struct.
-///
-/// ```no_run
-/// use std::num::NonZeroUsize;
-///
-/// use shady_audio::ShadyAudio;
-///
-/// fn main() {
-///     // use the default output and the internal heuristic config
-///     let mut audio = ShadyAudio::new(None, None, |err| panic!("{}", err));
-///
-///     // get the magnitudes with 10 entries
-///     let magnitudes = audio.fetch_magnitudes(NonZeroUsize::new(10).unwrap());
-///     assert_eq!(magnitudes.len(), 10);
-///
-///     // ... or in normalized form
-///     let norm_magnitudes = audio.fetch_magnitudes_normalized(NonZeroUsize::new(10).unwrap());
-///     for &norm_magn in norm_magnitudes {
-///         assert!(0.0 <= norm_magn);
-///         assert!(norm_magn <= 1.0);
-///     }
-///     assert_eq!(norm_magnitudes.len(), 10);
-/// }
-/// ```
-///
-/// > *Note*: The code example above is not run because the github-ci fails since it doesn't run alsa so you needn't worry ;)
+/// The main struct to interact with the crate.
 pub struct ShadyAudio {
     input_samples_buffer: Arc<Mutex<Vec<f32>>>,
 
