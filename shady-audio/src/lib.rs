@@ -4,7 +4,7 @@ use std::{
 };
 
 use cpal::{
-    traits::{DeviceTrait, StreamTrait},
+    traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleFormat, SampleRate, StreamError, SupportedStreamConfig,
 };
 use realfft::{num_complex::Complex32, num_traits::Zero, RealFftPlanner};
@@ -25,17 +25,24 @@ pub struct ShadyAudio {
 }
 
 impl ShadyAudio {
+    ///
     pub fn new<E>(
-        device: &cpal::Device,
-        stream_config: Option<SupportedStreamConfig>,
+        device: Option<&cpal::Device>,
+        stream_config: Option<&SupportedStreamConfig>,
         error_callback: E,
     ) -> Self
     where
         E: FnMut(StreamError) + Send + 'static,
     {
+        let default_device = cpal::default_host()
+            .default_output_device()
+            .expect("Default output device exists");
+
+        let device = device.unwrap_or(&default_device);
+
         let stream_config = {
             let default_output_config = default_output_config(device);
-            let supported_stream_config = stream_config.as_ref().unwrap_or(&default_output_config);
+            let supported_stream_config = stream_config.unwrap_or(&default_output_config);
 
             supported_stream_config.config()
         };
@@ -155,40 +162,6 @@ fn default_output_config(device: &cpal::Device) -> SupportedStreamConfig {
             device
                 .default_output_config()
                 .expect("Get default output config for device")
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use cpal::traits::HostTrait;
-
-    use super::*;
-
-    #[test]
-    fn expected_amount_of_channels() {
-        let device = cpal::default_host().default_output_device().unwrap();
-
-        let mut audio = ShadyAudio::new(&device, None, |err| panic!("{}", err));
-
-        let magnitudes = audio.fetch_magnitudes(NonZeroUsize::new(10).unwrap());
-
-        assert_eq!(magnitudes.len(), 10);
-    }
-
-    #[test]
-    fn normalized_values_are_really_normalized() {
-        let device = cpal::default_host().default_output_device().unwrap();
-
-        let mut audio = ShadyAudio::new(&device, None, |err| panic!("{}", err));
-
-        let magnitudes = audio.fetch_magnitudes_normalized(NonZeroUsize::new(10).unwrap());
-
-        assert_eq!(magnitudes.len(), 10);
-
-        for &magnitude in magnitudes.iter() {
-            assert!(0.0 <= magnitude);
-            assert!(magnitude <= 1.0);
         }
     }
 }

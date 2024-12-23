@@ -1,20 +1,21 @@
 use std::num::NonZeroUsize;
 
-use cpal::traits::HostTrait;
 use shady_audio::ShadyAudio;
 
 fn main() {
     println!("Hello there");
 
-    let host = cpal::default_host();
-
-    let device = host.default_output_device().unwrap();
-
-    let mut audio = ShadyAudio::new(&device, None, |err| panic!("{}", err));
+    let mut audio = ShadyAudio::new(None, None, |err| panic!("{}", err));
 
     // get the magnitudes with 10 entries
-    let _ = audio.fetch_magnitudes(NonZeroUsize::new(10).unwrap());
+    let magnitudes = audio.fetch_magnitudes(NonZeroUsize::new(10).unwrap());
+    assert_eq!(magnitudes.len(), 10);
 
     // ... or in normalized form
-    let _ = audio.fetch_magnitudes_normalized(NonZeroUsize::new(10).unwrap());
+    let norm_magnitudes = audio.fetch_magnitudes_normalized(NonZeroUsize::new(10).unwrap());
+    for &norm_magn in norm_magnitudes {
+        assert!(0.0 <= norm_magn);
+        assert!(norm_magn <= 1.0);
+    }
+    assert_eq!(norm_magnitudes.len(), 10);
 }
