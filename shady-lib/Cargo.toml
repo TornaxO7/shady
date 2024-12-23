@@ -7,10 +7,10 @@ description = "A shadertoy-like library to be able to easily integrate shadertoy
 license = "GPL2"
 
 [dependencies]
-cpal = "0.15"
-realfft = "3.4"
 bytemuck = { version = "1", features = ["derive"] }
 
+realfft.workspace = true
+cpal.workspace = true
 wgpu.workspace = true
 tracing.workspace = true
 thiserror.workspace = true

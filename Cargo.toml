@@ -1,5 +1,5 @@
 [workspace]
-members = ["shady-lib", "shady-app"]
+members = ["shady-lib", "shady-app", "shady-audio"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -10,3 +10,6 @@ wgpu = { version = "22.0", default-features = false, features = [
 ] }
 tracing = "0.1"
 thiserror = "2"
+
+cpal = "0.15"
+realfft = "3.4"

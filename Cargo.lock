@@ -2125,6 +2125,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "shady-audio"
+version = "0.1.0"
+dependencies = [
+ "cpal",
+ "realfft",
+ "tracing",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
