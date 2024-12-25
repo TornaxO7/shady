@@ -1,5 +1,5 @@
 [workspace]
-members = ["shady-lib", "shady-app", "shady-audio"]
+members = ["shady-lib", "shady-app", "shady-audio", "shady-cli"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -13,3 +13,4 @@ thiserror = "2"
 
 cpal = "0.15"
 realfft = "3.4"
+splines = "4"

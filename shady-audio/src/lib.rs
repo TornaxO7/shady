@@ -26,16 +26,17 @@
 //!     assert_eq!(norm_magnitudes.len(), 10);
 //! }
 //! ```
-use std::{
-    num::NonZeroUsize,
-    sync::{Arc, Mutex, TryLockError},
-};
+mod fft;
+mod frequency_bands;
+
+use std::sync::{Arc, Mutex};
 
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleFormat, SampleRate, StreamError, SupportedStreamConfig,
 };
-use realfft::{num_complex::Complex32, num_traits::Zero, RealFftPlanner};
+use fft::FftCalculator;
+use splines::{Interpolation, Key, Spline};
 use tracing::debug;
 
 const REQUIRED_SAMPLE_RATE: SampleRate = SampleRate(44_100); // unit: Hz, about audio stream quality
@@ -44,15 +45,24 @@ const REQUIRED_SAMPLE_RATE: SampleRate = SampleRate(44_100); // unit: Hz, about 
 pub struct ShadyAudio {
     input_samples_buffer: Arc<Mutex<Vec<f32>>>,
 
-    magnitudes_buffer: Vec<f32>,
+    highest_freq: f32,
 
-    fft_planner: RealFftPlanner<f32>,
-    fft_scratch_buffer: Vec<Complex32>,
-    fft_output: Vec<Complex32>,
+    fft: FftCalculator,
+
+    spline: Spline<f32, f32>,
+
     _stream: cpal::Stream,
+    stream_sample_rate: usize,
 }
 
 impl ShadyAudio {
+    pub fn default_with_callback<E>(error_callback: E) -> Self
+    where
+        E: FnMut(StreamError) + Send + 'static,
+    {
+        Self::new(None, None, error_callback)
+    }
+
     pub fn new<E>(
         device: Option<&cpal::Device>,
         stream_config: Option<&SupportedStreamConfig>,
@@ -83,13 +93,7 @@ impl ShadyAudio {
                     let moved_input_samples_buf = input_samples_buffer.clone();
 
                     move |input_samples: &[f32], _: &cpal::InputCallbackInfo| {
-                        let mut buf = match moved_input_samples_buf.try_lock() {
-                            Ok(raw_buf) => raw_buf,
-                            Err(err) => match err {
-                                TryLockError::Poisoned(_) => panic!("Poisened lock"),
-                                TryLockError::WouldBlock => return,
-                            },
-                        };
+                        let mut buf = moved_input_samples_buf.lock().unwrap();
                         buf.clear();
 
                         buf.resize(input_samples.len(), 0.0);
@@ -106,62 +110,48 @@ impl ShadyAudio {
         Self {
             input_samples_buffer,
             _stream: stream,
-            magnitudes_buffer: Vec::new(),
-            fft_scratch_buffer: Vec::new(),
-            fft_output: Vec::new(),
-            fft_planner: RealFftPlanner::new(),
+            highest_freq: f32::MIN,
+            spline: Spline::from_vec(Vec::new()),
+            stream_sample_rate: stream_config.sample_rate.0 as usize,
+            fft: FftCalculator::new(),
         }
     }
 
-    pub fn fetch_magnitudes(&mut self, amount_magnitudes: NonZeroUsize) -> &[f32] {
+    pub fn next_spline(&mut self) -> &Spline<f32, f32> {
+        self.spline.clear();
+
+        // magnitudes is from 0 to 1
         let mut buf = self.input_samples_buffer.lock().unwrap();
-
-        if buf.len() % 2 != 0 {
-            buf.push(0.0);
+        if buf.is_empty() {
+            return self.spline();
         }
 
-        let fft = self.fft_planner.plan_fft_forward(buf.len());
-        self.fft_output.resize(buf.len() / 2 + 1, Complex32::zero());
-        self.fft_scratch_buffer
-            .resize(fft.get_scratch_len(), Complex32::zero());
+        let (fft_size, magnitudes) = self.fft.process(&mut buf);
 
-        fft.process_with_scratch(&mut buf, &mut self.fft_output, &mut self.fft_scratch_buffer)
-            .unwrap();
+        let freq_step = self.stream_sample_rate / fft_size;
+        let start = 20 * fft_size / self.stream_sample_rate;
+        let end = 20_000 * fft_size / self.stream_sample_rate;
 
-        self.magnitudes_buffer.clear();
-        let step_size = self.fft_output.len() / amount_magnitudes;
-        for i in 0..amount_magnitudes.into() {
-            let start = i * step_size;
-            let end = (i + 1) * step_size;
-            let avg_magnitude = self.fft_output[start..end]
-                .iter()
-                .map(|magnitude| magnitude.norm())
-                .sum::<f32>();
-            self.magnitudes_buffer.push(avg_magnitude);
+        for (i, &mag) in magnitudes[start..end].iter().enumerate() {
+            // normalize the frequency to [0, 1]
+            let x = ((i * freq_step + start) - start) as f32 / (end - start) as f32;
+            let y = mag;
+
+            let key = Key::new(x, y, Interpolation::CatmullRom);
+
+            self.spline.add(key);
         }
 
-        &self.magnitudes_buffer
+        self.spline()
     }
 
-    pub fn fetch_magnitudes_normalized(&mut self, amount_magnitudes: NonZeroUsize) -> &[f32] {
-        self.fetch_magnitudes(amount_magnitudes);
+    fn spline(&self) -> &Spline<f32, f32> {
+        &self.spline
+    }
 
-        let max_magnitude = {
-            let mut max = self.magnitudes_buffer[0];
-            for &freq in self.magnitudes_buffer.iter() {
-                if max < freq {
-                    max = freq;
-                }
-            }
-            max
-        };
-
-        if max_magnitude > 0.0 {
-            for magnitude in self.magnitudes_buffer.iter_mut() {
-                *magnitude /= max_magnitude;
-            }
-        }
-        &self.magnitudes_buffer
+    // Reuses the old data and applies gravity effect.
+    fn update_data(&mut self) -> &Spline<f32, f32> {
+        self.spline()
     }
 }
 

@@ -8,7 +8,7 @@ fn main() {
     let mut audio = ShadyAudio::new(None, None, |err| panic!("{}", err));
 
     // get the magnitudes with 10 entries
-    let magnitudes = audio.fetch_magnitudes(NonZeroUsize::new(10).unwrap());
+    let magnitudes = audio.fetch_magnitudes_mut(NonZeroUsize::new(10).unwrap());
     assert_eq!(magnitudes.len(), 10);
 
     // ... or in normalized form

@@ -7,6 +7,7 @@ description = "A high level library build upon cpal to retrieve audio for visual
 license = "GPL2"
 
 [dependencies]
+splines.workspace = true
 cpal.workspace = true
 realfft.workspace = true
 tracing.workspace = true
