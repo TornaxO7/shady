@@ -1,13 +1,12 @@
 use realfft::{num_complex::Complex32, RealFftPlanner};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use tracing::debug;
 
 use crate::SAMPLE_RATE;
 
 pub const FFT_OUTPUT_SIZE: usize = SAMPLE_RATE / 2 + 1;
 const FFT_INPUT_SIZE: usize = SAMPLE_RATE;
 
-const AMOUNT_HIGHEST_MAGNITUDES: usize = 60;
+const AMOUNT_HIGHEST_MAGNITUDES: usize = 1000 / 60;
 const GRAVITY_DECAY: f32 = 0.99;
 
 pub struct FftCalculator {
@@ -15,6 +14,7 @@ pub struct FftCalculator {
     scratch_buffer: [Complex32; FFT_INPUT_SIZE],
     fft_output: [Complex32; FFT_OUTPUT_SIZE],
     magnitudes: [f32; FFT_OUTPUT_SIZE],
+    hann_window: [f32; FFT_INPUT_SIZE],
 
     highest_magnitudes: AllocRingBuffer<f32>,
 }
@@ -26,6 +26,10 @@ impl FftCalculator {
 
     pub fn process(&mut self, data: &mut [f32]) -> &[f32] {
         debug_assert_eq!(data.len(), FFT_INPUT_SIZE);
+
+        for (val, window) in data.iter_mut().zip(self.hann_window) {
+            *val *= window;
+        }
 
         self.calc_fft(data);
         self.calc_magnitudes();
@@ -63,12 +67,11 @@ impl FftCalculator {
         let curr_avg =
             self.highest_magnitudes.iter().sum::<f32>() / AMOUNT_HIGHEST_MAGNITUDES as f32;
 
-        curr_avg.min(600f32)
+        curr_avg
     }
 
     fn normalize_magnitudes(&mut self) {
         let max = self.current_highest_magnitude();
-        debug!("{}", max);
         for mag in self.magnitudes.iter_mut() {
             *mag /= max;
         }
@@ -77,11 +80,25 @@ impl FftCalculator {
 
 impl Default for FftCalculator {
     fn default() -> Self {
+        let hann_window = {
+            let mut hann_window = [0.; FFT_INPUT_SIZE];
+
+            for (i, val) in apodize::hanning_iter(FFT_INPUT_SIZE)
+                .map(|x| x as f32)
+                .enumerate()
+            {
+                hann_window[i] = val;
+            }
+
+            hann_window
+        };
+
         Self {
             planner: RealFftPlanner::new(),
             scratch_buffer: [Complex32::ZERO; FFT_INPUT_SIZE],
             fft_output: [Complex32::ZERO; FFT_OUTPUT_SIZE],
             magnitudes: [0.; FFT_OUTPUT_SIZE],
+            hann_window,
             highest_magnitudes: AllocRingBuffer::from([1.; AMOUNT_HIGHEST_MAGNITUDES]),
         }
     }

@@ -47,7 +47,7 @@ const EXP_BASE: f32 = 1.06;
 /// The main struct to interact with the crate.
 pub struct ShadyAudio {
     input_samples_buffer: Arc<Mutex<AllocRingBuffer<f32>>>,
-    input_snap: [f32; SAMPLE_RATE],
+    input_snapshot: [f32; SAMPLE_RATE],
 
     fft: FftCalculator,
     spline: Spline<f32, f32>,
@@ -112,7 +112,7 @@ impl ShadyAudio {
 
             for i in 0..amount_points as usize {
                 let x = i as f32 * step;
-                let key = Key::new(x, 0.0, splines::Interpolation::Linear);
+                let key = Key::new(x, 0.0, splines::Interpolation::CatmullRom);
                 spline.add(key);
             }
             spline
@@ -122,7 +122,7 @@ impl ShadyAudio {
             input_samples_buffer,
             _stream: stream,
             fft: FftCalculator::new(),
-            input_snap: [0.; SAMPLE_RATE],
+            input_snapshot: [0.; SAMPLE_RATE],
             spline,
         }
     }
@@ -133,25 +133,24 @@ impl ShadyAudio {
                 let audio = self.input_samples_buffer.lock().unwrap();
 
                 for i in 0..SAMPLE_RATE {
-                    self.input_snap[i] = *audio.get(i).unwrap_or(&0.0);
+                    self.input_snapshot[i] = *audio.get(i).unwrap_or(&0.0);
                 }
             }
 
-            self.fft.process(self.input_snap.as_mut_slice())
+            self.fft.process(self.input_snapshot.as_mut_slice())
         };
 
         let mut start_freq = 20.;
         let mut end_freq = start_freq * EXP_BASE;
         for i in 0..self.spline.len() {
-            let avg = magnitudes[start_freq as usize..end_freq as usize]
+            let value = magnitudes[start_freq as usize..end_freq as usize]
                 .iter()
-                .sum::<f32>()
-                / (end_freq - start_freq);
+                .fold(f32::MIN, |a, &b| a.max(b));
 
             start_freq = end_freq;
             end_freq = (end_freq * EXP_BASE).min(fft::FFT_OUTPUT_SIZE as f32);
 
-            *self.spline.get_mut(i).unwrap().value = avg;
+            *self.spline.get_mut(i).unwrap().value = value;
         }
 
         &self.spline
