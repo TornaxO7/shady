@@ -11,5 +11,6 @@ splines.workspace = true
 cpal.workspace = true
 realfft.workspace = true
 tracing.workspace = true
+
 ringbuffer = "0.15.0"
 apodize = "1"

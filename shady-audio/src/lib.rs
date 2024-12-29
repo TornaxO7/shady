@@ -88,25 +88,15 @@ impl ShadyAudio {
             self.fft.process(self.input_snapshot.as_mut_slice())
         };
 
-        debug!("{:?}", magnitudes);
-
         let mut start_freq = START_FREQ as f32;
         let mut end_freq = start_freq * EXP_BASE;
         for i in 0..self.spline.len() {
             let start = start_freq as usize;
             let end = end_freq as usize;
 
-            let value = magnitudes[start..end].iter().fold(f32::MIN, |a, &b| {
-                // debug!("{}.max({}) = {}", a, b, a.max(b));
-                a.max(b)
-            });
-            debug!(
-                "[{}..{}] = {:?} <=> value = {}",
-                start,
-                end,
-                &magnitudes[start..end],
-                value
-            );
+            let value = magnitudes[start..end]
+                .iter()
+                .fold(f32::MIN, |a, &b| a.max(b));
 
             start_freq = end_freq;
             end_freq = (end_freq * EXP_BASE).min(fft::FFT_OUTPUT_SIZE as f32);

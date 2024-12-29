@@ -8,7 +8,7 @@ pub const FFT_OUTPUT_SIZE: usize = SAMPLE_RATE / 2 + 1;
 const FFT_INPUT_SIZE: usize = SAMPLE_RATE;
 
 const AMOUNT_HIGHEST_MAGNITUDES: usize = 1000 / 60;
-const GRAVITY_DECAY: f32 = 0.99;
+const GRAVITY_DECAY: f32 = 0.975;
 
 pub struct FftCalculator {
     planner: RealFftPlanner<f32>,
@@ -18,6 +18,8 @@ pub struct FftCalculator {
     hann_window: Box<[f32; FFT_INPUT_SIZE]>,
 
     highest_magnitudes: AllocRingBuffer<f32>,
+    index_of_last_max: usize,
+    index_of_curr_max: usize,
 }
 
 impl FftCalculator {
@@ -64,6 +66,7 @@ impl FftCalculator {
             if START_FREQ <= i && i <= END_FREQ {
                 if mag > max {
                     max = mag;
+                    self.index_of_curr_max = i;
                 }
             }
 
@@ -81,10 +84,21 @@ impl FftCalculator {
     }
 
     fn normalize_magnitudes(&mut self) {
-        let max = self.current_highest_magnitude().max(1.);
-        for mag in self.magnitudes.iter_mut() {
-            *mag /= max;
+        let max = self.current_highest_magnitude();
+        for (i, mag) in self.magnitudes.iter_mut().enumerate() {
+            // It could be that the current audio is playing a very quiet section, so the average goes down to 0
+            // => avoid dividing by zero`
+            if max < 1. {
+                let sound_is_playing = (*mag - max).abs() > 0.001;
+                if i == self.index_of_last_max && sound_is_playing {
+                    *mag = 1.;
+                }
+            } else {
+                *mag /= max;
+            }
         }
+
+        self.index_of_last_max = self.index_of_curr_max;
     }
 }
 
@@ -109,6 +123,8 @@ impl Default for FftCalculator {
             fft_output: Box::new([Complex32::ZERO; FFT_OUTPUT_SIZE]),
             magnitudes: Box::new([0.; FFT_OUTPUT_SIZE]),
             hann_window,
+            index_of_last_max: 0,
+            index_of_curr_max: 0,
             highest_magnitudes: AllocRingBuffer::from([1.; AMOUNT_HIGHEST_MAGNITUDES]),
         }
     }
