@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fs::File, time::Duration};
 
 use crossterm::{
     event::{self, Event},
@@ -10,27 +10,16 @@ use ratatui::{
     Frame,
 };
 use shady_audio::ShadyAudio;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 fn main() -> std::io::Result<()> {
+    init_logger();
+
     let mut terminal = ratatui::init();
     let mut audio = ShadyAudio::default_with_callback(|err| panic!("{}", err));
 
     loop {
         let window_size = crossterm::terminal::window_size()?;
-
-        // let Some(spline) = audio.spline(0f32..10f32, splines::Interpolation::Cosine) else {
-        //     continue;
-        // };
-
-        // let mut buffer = Vec::new();
-
-        // for i in 0..10 {
-        //     match spline.clamped_sample(i as f32) {
-        //         Some(value) => buffer.push(value),
-        //         None => buffer.push(f32::NAN),
-        //     };
-        // }
-        // println!("{:?}", buffer);
 
         terminal
             .draw(|frame| draw(frame, &mut audio, window_size))
@@ -51,14 +40,16 @@ fn draw(frame: &mut Frame, audio: &mut ShadyAudio, window_size: WindowSize) {
     const MAX_HEIGHT: u64 = 100;
 
     let bar_group = {
-        let spline = audio.next_spline();
+        let spline = audio.fetch_block();
+        if spline.is_empty() {
+            return;
+        }
 
         let mut bars = Vec::with_capacity(window_size.columns.into());
         for column in 0..window_size.columns {
-            let value = spline
-                .clamped_sample(column as f32 / window_size.columns as f32)
-                .unwrap_or(0.0);
+            let frac = (column as f32) / (window_size.columns as f32);
 
+            let value = spline.clamped_sample(frac).unwrap_or(0.);
             bars.push(
                 Bar::default()
                     .text_value("".to_string())
@@ -76,4 +67,18 @@ fn draw(frame: &mut Frame, audio: &mut ShadyAudio, window_size: WindowSize) {
         .max(MAX_HEIGHT);
 
     frame.render_widget(&bar_chart, frame.area());
+}
+
+fn init_logger() {
+    let file = File::create("/tmp/shady-cli.log").unwrap();
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_target(false)
+        .with_writer(file)
+        .without_time();
+
+    tracing_subscriber::registry()
+        .with(fmt_layer)
+        .with(EnvFilter::from_env(EnvFilter::DEFAULT_ENV))
+        .init();
 }

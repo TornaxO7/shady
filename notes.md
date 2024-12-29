@@ -1,0 +1,2 @@
+- Not linear hearing: https://youtu.be/Y57ruDOwH1g?list=PLpM-Dvs8t0Vak1rrE2NJn8XYEJ5M7-BqT&t=5313
+- note frec: http://reden.sdf.org/mirroredwebsites/pages.mtu.edu/~suits/NoteFreqCalcs.html

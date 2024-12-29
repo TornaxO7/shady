@@ -27,8 +27,8 @@
 //! }
 //! ```
 mod fft;
-mod frequency_bands;
 
+use splines::{Key, Spline};
 use std::sync::{Arc, Mutex};
 
 use cpal::{
@@ -36,23 +36,23 @@ use cpal::{
     SampleFormat, SampleRate, StreamError, SupportedStreamConfig,
 };
 use fft::FftCalculator;
-use splines::{Interpolation, Key, Spline};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 use tracing::debug;
 
-const REQUIRED_SAMPLE_RATE: SampleRate = SampleRate(44_100); // unit: Hz, about audio stream quality
+const SAMPLE_RATE: usize = 44_100;
+const REQUIRED_SAMPLE_RATE: SampleRate = SampleRate(SAMPLE_RATE as u32); // unit: Hz, about audio stream quality
+
+const EXP_BASE: f32 = 1.06;
 
 /// The main struct to interact with the crate.
 pub struct ShadyAudio {
-    input_samples_buffer: Arc<Mutex<Vec<f32>>>,
-
-    highest_freq: f32,
+    input_samples_buffer: Arc<Mutex<AllocRingBuffer<f32>>>,
+    input_snap: [f32; SAMPLE_RATE],
 
     fft: FftCalculator,
-
     spline: Spline<f32, f32>,
 
     _stream: cpal::Stream,
-    stream_sample_rate: usize,
 }
 
 impl ShadyAudio {
@@ -84,20 +84,17 @@ impl ShadyAudio {
             supported_stream_config.config()
         };
 
-        let input_samples_buffer = Arc::new(Mutex::new(Vec::new()));
+        let input_samples_buffer: Arc<Mutex<AllocRingBuffer<f32>>> =
+            Arc::new(Mutex::new(AllocRingBuffer::new(SAMPLE_RATE)));
 
         let stream = device
             .build_input_stream(
                 &stream_config,
                 {
-                    let moved_input_samples_buf = input_samples_buffer.clone();
-
+                    let buffer = input_samples_buffer.clone();
                     move |input_samples: &[f32], _: &cpal::InputCallbackInfo| {
-                        let mut buf = moved_input_samples_buf.lock().unwrap();
-                        buf.clear();
-
-                        buf.resize(input_samples.len(), 0.0);
-                        buf.copy_from_slice(input_samples);
+                        let mut buf = buffer.lock().unwrap();
+                        buf.extend(input_samples.iter().cloned());
                     }
                 },
                 error_callback,
@@ -107,51 +104,57 @@ impl ShadyAudio {
 
         stream.play().expect("Start listening to audio");
 
+        let spline = {
+            let mut spline = Spline::from_vec(vec![]);
+
+            let amount_points = (fft::FFT_OUTPUT_SIZE as f32 / 20.).log(EXP_BASE).ceil();
+            let step = 1. / amount_points;
+
+            for i in 0..amount_points as usize {
+                let x = i as f32 * step;
+                let key = Key::new(x, 0.0, splines::Interpolation::Linear);
+                spline.add(key);
+            }
+            spline
+        };
+
         Self {
             input_samples_buffer,
             _stream: stream,
-            highest_freq: f32::MIN,
-            spline: Spline::from_vec(Vec::new()),
-            stream_sample_rate: stream_config.sample_rate.0 as usize,
             fft: FftCalculator::new(),
+            input_snap: [0.; SAMPLE_RATE],
+            spline,
         }
     }
 
-    pub fn next_spline(&mut self) -> &Spline<f32, f32> {
-        self.spline.clear();
+    pub fn fetch_block(&mut self) -> &Spline<f32, f32> {
+        let magnitudes = {
+            {
+                let audio = self.input_samples_buffer.lock().unwrap();
 
-        // magnitudes is from 0 to 1
-        let mut buf = self.input_samples_buffer.lock().unwrap();
-        if buf.is_empty() {
-            return self.spline();
+                for i in 0..SAMPLE_RATE {
+                    self.input_snap[i] = *audio.get(i).unwrap_or(&0.0);
+                }
+            }
+
+            self.fft.process(self.input_snap.as_mut_slice())
+        };
+
+        let mut start_freq = 20.;
+        let mut end_freq = start_freq * EXP_BASE;
+        for i in 0..self.spline.len() {
+            let avg = magnitudes[start_freq as usize..end_freq as usize]
+                .iter()
+                .sum::<f32>()
+                / (end_freq - start_freq);
+
+            start_freq = end_freq;
+            end_freq = (end_freq * EXP_BASE).min(fft::FFT_OUTPUT_SIZE as f32);
+
+            *self.spline.get_mut(i).unwrap().value = avg;
         }
 
-        let (fft_size, magnitudes) = self.fft.process(&mut buf);
-
-        let freq_step = self.stream_sample_rate / fft_size;
-        let start = 20 * fft_size / self.stream_sample_rate;
-        let end = 20_000 * fft_size / self.stream_sample_rate;
-
-        for (i, &mag) in magnitudes[start..end].iter().enumerate() {
-            // normalize the frequency to [0, 1]
-            let x = ((i * freq_step + start) - start) as f32 / (end - start) as f32;
-            let y = mag;
-
-            let key = Key::new(x, y, Interpolation::CatmullRom);
-
-            self.spline.add(key);
-        }
-
-        self.spline()
-    }
-
-    fn spline(&self) -> &Spline<f32, f32> {
         &self.spline
-    }
-
-    // Reuses the old data and applies gravity effect.
-    fn update_data(&mut self) -> &Spline<f32, f32> {
-        self.spline()
     }
 }
 
@@ -162,7 +165,6 @@ fn default_output_config(device: &cpal::Device) -> SupportedStreamConfig {
         .filter(|entry| {
             entry.channels() == 1
                 && entry.sample_format() == SampleFormat::F32
-                && entry.max_sample_rate() >= REQUIRED_SAMPLE_RATE
                 && entry.min_sample_rate() <= REQUIRED_SAMPLE_RATE
         })
         .collect();
@@ -172,7 +174,7 @@ fn default_output_config(device: &cpal::Device) -> SupportedStreamConfig {
     match matching_configs.into_iter().next() {
         Some(config) => {
             debug!("Found matching output config: {:?}", config);
-            config.with_sample_rate(REQUIRED_SAMPLE_RATE)
+            config.with_max_sample_rate()
         }
         None => {
             debug!("Didn't find matching output config. Fallback to default_output_config.");

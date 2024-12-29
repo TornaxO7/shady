@@ -9,7 +9,9 @@ license = "GPL2"
 [dependencies]
 crossterm = "0.28.1"
 ratatui = "0.29"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 shady-audio = { path = "../shady-audio" }
 
 splines.workspace = true
+tracing.workspace = true

@@ -1,16 +1,22 @@
-use realfft::{
-    num_complex::{Complex, Complex32},
-    FftNum, RealFftPlanner,
-};
+use realfft::{num_complex::Complex32, RealFftPlanner};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
+use tracing::debug;
+
+use crate::SAMPLE_RATE;
+
+pub const FFT_OUTPUT_SIZE: usize = SAMPLE_RATE / 2 + 1;
+const FFT_INPUT_SIZE: usize = SAMPLE_RATE;
+
+const AMOUNT_HIGHEST_MAGNITUDES: usize = 60;
+const GRAVITY_DECAY: f32 = 0.99;
 
 pub struct FftCalculator {
     planner: RealFftPlanner<f32>,
-    scratch_buffer: Vec<Complex32>,
-    fft_output: Vec<Complex32>,
-    fft_size: usize,
-    magnitudes: Vec<f32>,
+    scratch_buffer: [Complex32; FFT_INPUT_SIZE],
+    fft_output: [Complex32; FFT_OUTPUT_SIZE],
+    magnitudes: [f32; FFT_OUTPUT_SIZE],
 
-    highest_magnitude: f32,
+    highest_magnitudes: AllocRingBuffer<f32>,
 }
 
 impl FftCalculator {
@@ -18,51 +24,20 @@ impl FftCalculator {
         Self::default()
     }
 
-    pub fn process(&mut self, data: &mut Vec<f32>) -> (usize, &[f32]) {
-        assert!(!data.is_empty());
+    pub fn process(&mut self, data: &mut [f32]) -> &[f32] {
+        debug_assert_eq!(data.len(), FFT_INPUT_SIZE);
 
         self.calc_fft(data);
         self.calc_magnitudes();
-        // self.adjust_magnitudes();
-        self.update_max_min_magnitude();
         self.normalize_magnitudes();
 
-        (self.fft_size(), self.magnitudes())
-    }
-
-    pub fn magnitudes(&self) -> &[f32] {
         &self.magnitudes
     }
 
-    pub fn fft_size(&self) -> usize {
-        self.fft_size
-    }
-
-    fn update_max_min_magnitude(&mut self) {
-        for &val in self.magnitudes.iter() {
-            // if val < self.lowest_magnitude {
-            //     self.lowest_magnitude = val;
-            // }
-            if val > self.highest_magnitude {
-                self.highest_magnitude = val;
-            }
-        }
-    }
-
-    fn calc_fft(&mut self, data: &mut Vec<f32>) {
-        if data.len() % 2 != 0 {
-            data.push(0.);
-        }
-
-        self.fft_size = data.len();
-        let fft = self.planner.plan_fft_forward(self.fft_size);
-        self.fft_output
-            .resize(self.fft_size / 2 + 1, Complex32::ZERO);
-        self.scratch_buffer
-            .resize(fft.get_scratch_len(), Complex32::ZERO);
-
+    fn calc_fft(&mut self, data: &mut [f32]) {
+        let fft = self.planner.plan_fft_forward(FFT_INPUT_SIZE);
         fft.process_with_scratch(
-            data,
+            &mut data.to_vec(),
             self.fft_output.as_mut_slice(),
             self.scratch_buffer.as_mut_slice(),
         )
@@ -71,28 +46,31 @@ impl FftCalculator {
 
     // Calculates the magnitudes out of the fft output
     fn calc_magnitudes(&mut self) {
-        self.magnitudes.resize(self.fft_output.len(), 0.);
+        let mut max = f32::MIN;
         for (i, val) in self.fft_output.iter().enumerate() {
-            self.magnitudes[i] = val.norm();
+            let mag = val.norm();
+            if mag > max {
+                max = mag;
+            }
+
+            self.magnitudes[i] = mag.max(self.magnitudes[i] * GRAVITY_DECAY);
         }
+
+        self.highest_magnitudes.push(max);
     }
 
-    // to make higher frequencies louder
-    fn adjust_magnitudes(&mut self) {
-        let mag_len = self.magnitudes.len();
-        for (i, val) in self.magnitudes.iter_mut().enumerate() {
-            let percentage = (i + 1) as f32 / mag_len as f32;
+    fn current_highest_magnitude(&self) -> f32 {
+        let curr_avg =
+            self.highest_magnitudes.iter().sum::<f32>() / AMOUNT_HIGHEST_MAGNITUDES as f32;
 
-            let log: f32 = 1. / 2f32.log(percentage + 1.);
-            let exp: f32 = percentage.sqrt();
-
-            *val *= (log + exp) / 2. * 0.1;
-        }
+        curr_avg.min(600f32)
     }
 
     fn normalize_magnitudes(&mut self) {
+        let max = self.current_highest_magnitude();
+        debug!("{}", max);
         for mag in self.magnitudes.iter_mut() {
-            *mag /= self.highest_magnitude;
+            *mag /= max;
         }
     }
 }
@@ -101,11 +79,10 @@ impl Default for FftCalculator {
     fn default() -> Self {
         Self {
             planner: RealFftPlanner::new(),
-            scratch_buffer: Vec::new(),
-            fft_output: Vec::new(),
-            magnitudes: Vec::new(),
-            fft_size: 0,
-            highest_magnitude: f32::MIN,
+            scratch_buffer: [Complex32::ZERO; FFT_INPUT_SIZE],
+            fft_output: [Complex32::ZERO; FFT_OUTPUT_SIZE],
+            magnitudes: [0.; FFT_OUTPUT_SIZE],
+            highest_magnitudes: AllocRingBuffer::from([1.; AMOUNT_HIGHEST_MAGNITUDES]),
         }
     }
 }
