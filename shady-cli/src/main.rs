@@ -50,11 +50,11 @@ fn draw(frame: &mut Frame, audio: &mut ShadyAudio, window_size: WindowSize) {
         for column in 0..window_size.columns + 1 {
             let frac = (column as f32) / (window_size.columns as f32);
 
-            let value = spline.clamped_sample(frac).unwrap_or(0.);
+            let value = spline.sample(frac).unwrap_or(0.0);
             bars.push(
                 Bar::default()
                     .text_value("".to_string())
-                    .value((value * MAX_HEIGHT as f32).max(1.) as u64),
+                    .value((value * MAX_HEIGHT as f32) as u64),
             );
         }
 

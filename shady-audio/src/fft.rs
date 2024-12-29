@@ -1,7 +1,8 @@
 use realfft::{num_complex::Complex32, RealFftPlanner};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
+use tracing::debug;
 
-use crate::SAMPLE_RATE;
+use crate::{END_FREQ, SAMPLE_RATE, START_FREQ};
 
 pub const FFT_OUTPUT_SIZE: usize = SAMPLE_RATE / 2 + 1;
 const FFT_INPUT_SIZE: usize = SAMPLE_RATE;
@@ -11,10 +12,10 @@ const GRAVITY_DECAY: f32 = 0.99;
 
 pub struct FftCalculator {
     planner: RealFftPlanner<f32>,
-    scratch_buffer: [Complex32; FFT_INPUT_SIZE],
-    fft_output: [Complex32; FFT_OUTPUT_SIZE],
-    magnitudes: [f32; FFT_OUTPUT_SIZE],
-    hann_window: [f32; FFT_INPUT_SIZE],
+    scratch_buffer: Box<[Complex32; FFT_INPUT_SIZE]>,
+    fft_output: Box<[Complex32; FFT_OUTPUT_SIZE]>,
+    magnitudes: Box<[f32; FFT_OUTPUT_SIZE]>,
+    hann_window: Box<[f32; FFT_INPUT_SIZE]>,
 
     highest_magnitudes: AllocRingBuffer<f32>,
 }
@@ -25,17 +26,23 @@ impl FftCalculator {
     }
 
     pub fn process(&mut self, data: &mut [f32]) -> &[f32] {
+        self.process_inner(data, true)
+    }
+
+    fn process_inner(&mut self, data: &mut [f32], window: bool) -> &[f32] {
         debug_assert_eq!(data.len(), FFT_INPUT_SIZE);
 
-        for (val, window) in data.iter_mut().zip(self.hann_window) {
-            *val *= window;
+        if window {
+            for (val, window) in data.iter_mut().zip(self.hann_window.iter()) {
+                *val *= window;
+            }
         }
 
         self.calc_fft(data);
         self.calc_magnitudes();
         self.normalize_magnitudes();
 
-        &self.magnitudes
+        self.magnitudes.as_ref()
     }
 
     fn calc_fft(&mut self, data: &mut [f32]) {
@@ -53,8 +60,11 @@ impl FftCalculator {
         let mut max = f32::MIN;
         for (i, val) in self.fft_output.iter().enumerate() {
             let mag = val.norm();
-            if mag > max {
-                max = mag;
+
+            if START_FREQ <= i && i <= END_FREQ {
+                if mag > max {
+                    max = mag;
+                }
             }
 
             self.magnitudes[i] = mag.max(self.magnitudes[i] * GRAVITY_DECAY);
@@ -71,7 +81,7 @@ impl FftCalculator {
     }
 
     fn normalize_magnitudes(&mut self) {
-        let max = self.current_highest_magnitude();
+        let max = self.current_highest_magnitude().max(1.);
         for mag in self.magnitudes.iter_mut() {
             *mag /= max;
         }
@@ -81,7 +91,7 @@ impl FftCalculator {
 impl Default for FftCalculator {
     fn default() -> Self {
         let hann_window = {
-            let mut hann_window = [0.; FFT_INPUT_SIZE];
+            let mut hann_window = Box::new([0.; FFT_INPUT_SIZE]);
 
             for (i, val) in apodize::hanning_iter(FFT_INPUT_SIZE)
                 .map(|x| x as f32)
@@ -95,11 +105,55 @@ impl Default for FftCalculator {
 
         Self {
             planner: RealFftPlanner::new(),
-            scratch_buffer: [Complex32::ZERO; FFT_INPUT_SIZE],
-            fft_output: [Complex32::ZERO; FFT_OUTPUT_SIZE],
-            magnitudes: [0.; FFT_OUTPUT_SIZE],
+            scratch_buffer: Box::new([Complex32::ZERO; FFT_INPUT_SIZE]),
+            fft_output: Box::new([Complex32::ZERO; FFT_OUTPUT_SIZE]),
+            magnitudes: Box::new([0.; FFT_OUTPUT_SIZE]),
             hann_window,
             highest_magnitudes: AllocRingBuffer::from([1.; AMOUNT_HIGHEST_MAGNITUDES]),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// aka: 20Khz
+    ///
+    /// Check if the magnitudes are correctly calculated. In this case, we just want the magnitude
+    /// for 20kHz to have a spike
+    mod highest_freq {
+
+        use super::*;
+
+        fn sin(x: f32) -> f32 {
+            (2. * std::f32::consts::PI * 20_000. * x).sin()
+        }
+
+        #[test]
+        fn test() {
+            let mut fft = FftCalculator::new();
+
+            let mut data = {
+                let mut data: [f32; FFT_INPUT_SIZE] = [0.; FFT_INPUT_SIZE];
+
+                for i in 0..FFT_INPUT_SIZE {
+                    let frac = i as f32 / SAMPLE_RATE as f32;
+
+                    data[i] = sin(frac);
+                }
+
+                data
+            };
+
+            let magnitudes = fft.process_inner(&mut data, false);
+            for (i, &mag) in magnitudes.iter().enumerate() {
+                if i != 20_000 {
+                    assert!(mag < 0.5, "Non-20kHz frequency has magnitude of: {}", mag);
+                } else {
+                    assert!(mag >= 1., "20kHz frequency has magnitude of: {}", mag);
+                }
+            }
         }
     }
 }

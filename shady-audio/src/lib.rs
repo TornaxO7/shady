@@ -26,33 +26,35 @@
 //!     assert_eq!(norm_magnitudes.len(), 10);
 //! }
 //! ```
+mod fetcher;
 mod fft;
 
-use splines::{Key, Spline};
-use std::sync::{Arc, Mutex};
-
-use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
-    SampleFormat, SampleRate, StreamError, SupportedStreamConfig,
-};
+use cpal::{SampleRate, StreamError, SupportedStreamConfig};
+use fetcher::SystemAudio;
 use fft::FftCalculator;
-use ringbuffer::{AllocRingBuffer, RingBuffer};
+use splines::{Key, Spline};
 use tracing::debug;
+
+type Hz = usize;
 
 const SAMPLE_RATE: usize = 44_100;
 const REQUIRED_SAMPLE_RATE: SampleRate = SampleRate(SAMPLE_RATE as u32); // unit: Hz, about audio stream quality
 
+const START_FREQ: Hz = 20;
+const END_FREQ: Hz = 20_000;
 const EXP_BASE: f32 = 1.06;
+
+trait Data {
+    fn fetch_snapshot(&mut self, buf: &mut [f32]);
+}
 
 /// The main struct to interact with the crate.
 pub struct ShadyAudio {
-    input_samples_buffer: Arc<Mutex<AllocRingBuffer<f32>>>,
-    input_snapshot: [f32; SAMPLE_RATE],
+    input_snapshot: Box<[f32; SAMPLE_RATE]>,
 
+    data: Box<dyn Data>,
     fft: FftCalculator,
     spline: Spline<f32, f32>,
-
-    _stream: cpal::Stream,
 }
 
 impl ShadyAudio {
@@ -71,81 +73,40 @@ impl ShadyAudio {
     where
         E: FnMut(StreamError) + Send + 'static,
     {
-        let default_device = cpal::default_host()
-            .default_output_device()
-            .expect("Default output device exists");
-
-        let device = device.unwrap_or(&default_device);
-
-        let stream_config = {
-            let default_output_config = default_output_config(device);
-            let supported_stream_config = stream_config.unwrap_or(&default_output_config);
-
-            supported_stream_config.config()
-        };
-
-        let input_samples_buffer: Arc<Mutex<AllocRingBuffer<f32>>> =
-            Arc::new(Mutex::new(AllocRingBuffer::new(SAMPLE_RATE)));
-
-        let stream = device
-            .build_input_stream(
-                &stream_config,
-                {
-                    let buffer = input_samples_buffer.clone();
-                    move |input_samples: &[f32], _: &cpal::InputCallbackInfo| {
-                        let mut buf = buffer.lock().unwrap();
-                        buf.extend(input_samples.iter().cloned());
-                    }
-                },
-                error_callback,
-                None,
-            )
-            .expect("Start audio listening");
-
-        stream.play().expect("Start listening to audio");
-
-        let spline = {
-            let mut spline = Spline::from_vec(vec![]);
-
-            let amount_points = (fft::FFT_OUTPUT_SIZE as f32 / 20.).log(EXP_BASE).ceil();
-            let step = 1. / amount_points;
-
-            for i in 0..amount_points as usize {
-                let x = i as f32 * step;
-                let key = Key::new(x, 0.0, splines::Interpolation::CatmullRom);
-                spline.add(key);
-            }
-            spline
-        };
-
+        let data = SystemAudio::boxed(device, stream_config, error_callback);
         Self {
-            input_samples_buffer,
-            _stream: stream,
+            data,
             fft: FftCalculator::new(),
-            input_snapshot: [0.; SAMPLE_RATE],
-            spline,
+            input_snapshot: Box::new([0.; SAMPLE_RATE]),
+            spline: default_spline(),
         }
     }
 
     pub fn fetch_block(&mut self) -> &Spline<f32, f32> {
         let magnitudes = {
-            {
-                let audio = self.input_samples_buffer.lock().unwrap();
-
-                for i in 0..SAMPLE_RATE {
-                    self.input_snapshot[i] = *audio.get(i).unwrap_or(&0.0);
-                }
-            }
-
+            self.data.fetch_snapshot(self.input_snapshot.as_mut_slice());
             self.fft.process(self.input_snapshot.as_mut_slice())
         };
 
-        let mut start_freq = 20.;
+        debug!("{:?}", magnitudes);
+
+        let mut start_freq = START_FREQ as f32;
         let mut end_freq = start_freq * EXP_BASE;
         for i in 0..self.spline.len() {
-            let value = magnitudes[start_freq as usize..end_freq as usize]
-                .iter()
-                .fold(f32::MIN, |a, &b| a.max(b));
+            let start = start_freq as usize;
+            let end = end_freq as usize;
+
+            let value = magnitudes[start..end].iter().fold(f32::MIN, |a, &b| {
+                // debug!("{}.max({}) = {}", a, b, a.max(b));
+                a.max(b)
+            });
+            debug!(
+                "[{}..{}] = {:?} <=> value = {}",
+                start,
+                end,
+                &magnitudes[start..end],
+                value
+            );
 
             start_freq = end_freq;
             end_freq = (end_freq * EXP_BASE).min(fft::FFT_OUTPUT_SIZE as f32);
@@ -157,29 +118,18 @@ impl ShadyAudio {
     }
 }
 
-fn default_output_config(device: &cpal::Device) -> SupportedStreamConfig {
-    let mut matching_configs: Vec<_> = device
-        .supported_output_configs()
-        .expect("Get supported output configs of device")
-        .filter(|entry| {
-            entry.channels() == 1
-                && entry.sample_format() == SampleFormat::F32
-                && entry.min_sample_rate() <= REQUIRED_SAMPLE_RATE
-        })
-        .collect();
+fn default_spline() -> Spline<f32, f32> {
+    let mut spline = Spline::from_vec(vec![]);
 
-    matching_configs.sort_by(|a, b| a.cmp_default_heuristics(b));
+    let amount_points = (fft::FFT_OUTPUT_SIZE as f32 / START_FREQ as f32)
+        .log(EXP_BASE)
+        .ceil();
+    let step = 1. / amount_points;
 
-    match matching_configs.into_iter().next() {
-        Some(config) => {
-            debug!("Found matching output config: {:?}", config);
-            config.with_max_sample_rate()
-        }
-        None => {
-            debug!("Didn't find matching output config. Fallback to default_output_config.");
-            device
-                .default_output_config()
-                .expect("Get default output config for device")
-        }
+    for i in 0..amount_points as usize {
+        let x = i as f32 * step;
+        let key = Key::new(x, 0.0, splines::Interpolation::Cosine);
+        spline.add(key);
     }
+    spline
 }
