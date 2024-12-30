@@ -114,7 +114,7 @@ fn default_spline() -> Spline<f32, f32> {
     let amount_points = (fft::FFT_OUTPUT_SIZE as f32 / START_FREQ as f32)
         .log(EXP_BASE)
         .ceil();
-    let step = 1. / amount_points;
+    let step = 1. / (amount_points - 1.); // `-1` in order to reach `1.`
 
     for i in 0..amount_points as usize {
         let x = i as f32 * step;
