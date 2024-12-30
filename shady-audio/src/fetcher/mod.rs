@@ -2,12 +2,11 @@ use std::sync::{Arc, Mutex};
 
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    SampleFormat, StreamError, SupportedStreamConfig,
+    SampleFormat, SampleRate, StreamError, SupportedStreamConfigRange,
 };
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use tracing::debug;
 
-use crate::{Data, REQUIRED_SAMPLE_RATE, SAMPLE_RATE};
+use crate::{Data, DEFAULT_SAMPLE_RATE};
 
 pub struct SystemAudio {
     data_snapshot: Arc<Mutex<AllocRingBuffer<f32>>>,
@@ -17,7 +16,7 @@ pub struct SystemAudio {
 impl SystemAudio {
     pub fn boxed<E>(
         device: Option<&cpal::Device>,
-        stream_config: Option<&SupportedStreamConfig>,
+        stream_config_range: Option<&SupportedStreamConfigRange>,
         error_callback: E,
     ) -> Box<Self>
     where
@@ -31,22 +30,32 @@ impl SystemAudio {
 
         let stream_config = {
             let default_output_config = default_output_config(device);
-            let supported_stream_config = stream_config.unwrap_or(&default_output_config);
+            let supported_stream_config = stream_config_range.unwrap_or(&default_output_config);
 
-            supported_stream_config.config()
+            supported_stream_config
+                .try_with_sample_rate(SampleRate(DEFAULT_SAMPLE_RATE as u32))
+                .unwrap_or_else(|| todo!("We currently support only stream configs which are able to provide a sample rate of 44.100Hz."))
+                .config()
         };
 
         let data_snapshot: Arc<Mutex<AllocRingBuffer<f32>>> =
-            Arc::new(Mutex::new(AllocRingBuffer::new(SAMPLE_RATE)));
+            Arc::new(Mutex::new(AllocRingBuffer::new(DEFAULT_SAMPLE_RATE)));
 
         let stream = device
             .build_input_stream(
                 &stream_config,
                 {
                     let buffer = data_snapshot.clone();
-                    move |input_samples: &[f32], _: &cpal::InputCallbackInfo| {
+                    let amount_channels = stream_config.channels;
+
+                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         let mut buf = buffer.lock().unwrap();
-                        buf.extend(input_samples.iter().cloned());
+
+                        let chunks = data
+                            .chunks_exact(amount_channels.into())
+                            .map(|chunk| chunk.iter().sum::<f32>() / amount_channels as f32);
+
+                        buf.extend(chunks);
                     }
                 },
                 error_callback,
@@ -65,37 +74,31 @@ impl SystemAudio {
 
 impl Data for SystemAudio {
     fn fetch_snapshot(&mut self, buf: &mut [f32]) {
+        debug_assert_eq!(buf.len(), DEFAULT_SAMPLE_RATE);
+
         let audio = self.data_snapshot.lock().unwrap();
 
-        for i in 0..SAMPLE_RATE {
-            buf[i] = *audio.get(i).unwrap_or(&0.);
+        for (buf_val, &snap_val) in buf.iter_mut().zip(audio.iter()) {
+            *buf_val = snap_val;
         }
     }
 }
 
-fn default_output_config(device: &cpal::Device) -> SupportedStreamConfig {
+fn default_output_config(device: &cpal::Device) -> SupportedStreamConfigRange {
     let mut matching_configs: Vec<_> = device
         .supported_output_configs()
         .expect("Get supported output configs of device")
         .filter(|entry| {
             entry.channels() == 1
                 && entry.sample_format() == SampleFormat::F32
-                && entry.min_sample_rate() <= REQUIRED_SAMPLE_RATE
+                && entry.min_sample_rate() <= SampleRate(DEFAULT_SAMPLE_RATE as u32)
         })
         .collect();
 
     matching_configs.sort_by(|a, b| a.cmp_default_heuristics(b));
 
-    match matching_configs.into_iter().next() {
-        Some(config) => {
-            debug!("Found matching output config: {:?}", config);
-            config.with_max_sample_rate()
-        }
-        None => {
-            debug!("Didn't find matching output config. Fallback to default_output_config.");
-            device
-                .default_output_config()
-                .expect("Get default output config for device")
-        }
-    }
+    matching_configs
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| panic!("Couldn't find suitable config"))
 }

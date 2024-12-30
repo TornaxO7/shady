@@ -10,7 +10,6 @@ use ratatui::{
     Frame,
 };
 use shady_audio::ShadyAudio;
-use tracing::debug;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 fn main() -> std::io::Result<()> {
@@ -41,13 +40,13 @@ fn draw(frame: &mut Frame, audio: &mut ShadyAudio, window_size: WindowSize) {
     const MAX_HEIGHT: u64 = 100;
 
     let bar_group = {
-        let spline = audio.fetch_block();
-        if spline.is_empty() {
-            return;
-        }
+        let spline = audio.get_spline();
+        // if spline.is_empty() {
+        //     return;
+        // }
 
         let mut bars = Vec::with_capacity(window_size.columns.into());
-        for column in 0..window_size.columns + 1 {
+        for column in 0..window_size.columns {
             let frac = (column as f32) / (window_size.columns as f32);
 
             let value = spline.sample(frac).unwrap_or(0.0);
