@@ -2,7 +2,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    naersk.url = "github:nix-community/naersk";
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
@@ -55,7 +54,7 @@
                 rust-toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
               in
               pkgs.mkShell rec {
-                buildInputs = dependencies ++ [ rust-toolchain ];
+                buildInputs = dependencies ++ [ rust-toolchain ] ++ (with pkgs; [ cargo-flamegraph ]);
 
                 shellHook = ''
                   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${lib.makeLibraryPath buildInputs}
