@@ -11,6 +11,8 @@ target/
 
 .direnv/
 
+perf.data*
+flamegraph*
 
 # Added by cargo
 

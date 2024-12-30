@@ -1,28 +1,37 @@
-use crate::{fft, DEFAULT_SAMPLE_RATE, START_FREQ};
+use crate::{fft, START_FREQ};
+use cpal::SampleRate;
 use splines::{Key, Spline};
+use tracing::debug;
 
 const EXP_BASE: f32 = 1.06;
 
-const _INVARIANT_CHECK: () = const {
-    // Currently, for calculating the frequencies, we're assuming that the sample rate
-    // equals the fft size (aka the input size) because this would mean for the output
-    // that the frequency represents the index of the fft output.
-    assert!(DEFAULT_SAMPLE_RATE == fft::FFT_INPUT_SIZE);
-};
-
 pub struct FreqSpline {
     spline: Spline<f32, f32>,
+    freq_step: f32,
+    amount_points: usize,
 }
 
 impl FreqSpline {
-    pub fn new() -> Self {
+    pub fn new(sample_rate: SampleRate) -> Self {
+        let freq_step = sample_rate.0 as f32 / fft::FFT_INPUT_SIZE as f32;
+
+        let amount_points = {
+            let mut counter: usize = 0;
+            let mut end_freq = (START_FREQ as f32 + freq_step) * EXP_BASE;
+
+            while end_freq < fft::FFT_OUTPUT_SIZE as f32 {
+                counter += 1;
+                end_freq = (START_FREQ as f32 + counter as f32 * freq_step)
+                    * EXP_BASE.powi(counter as i32);
+            }
+
+            counter
+        };
+
         let spline = {
             let mut spline = Spline::from_vec(vec![]);
 
-            let amount_points = (fft::FFT_OUTPUT_SIZE as f32 / START_FREQ as f32)
-                .log(EXP_BASE)
-                .ceil();
-            let step = 1. / (amount_points - 1.); // `-1` in order to reach `1.`
+            let step = 1. / (amount_points - 1) as f32; // `-1` in order to reach `1.`
 
             for i in 0..amount_points as usize {
                 let x = i as f32 * step;
@@ -32,25 +41,36 @@ impl FreqSpline {
             spline
         };
 
-        Self { spline }
+        Self {
+            spline,
+            amount_points,
+            freq_step,
+        }
     }
 
     pub fn update(&mut self, magnitudes: &[f32]) {
         debug_assert_eq!(magnitudes.len(), fft::FFT_OUTPUT_SIZE);
 
         let mut start_freq = START_FREQ as f32;
-        let mut end_freq = start_freq * EXP_BASE;
+        let mut end_freq = (start_freq + self.freq_step) * EXP_BASE;
 
-        for i in 0..self.spline.len() {
+        for i in 0..self.amount_points {
             let start = start_freq as usize;
             let end = end_freq as usize;
 
             let value = magnitudes[start..end].iter().sum::<f32>() / (end - start) as f32;
 
             start_freq = end_freq;
-            end_freq = (end_freq * EXP_BASE).min(fft::FFT_OUTPUT_SIZE as f32);
+            end_freq = {
+                let i_next = i + 1;
 
-            *self.spline.get_mut(i).unwrap().value = value;
+                let next_general_end = (START_FREQ as f32) + i_next as f32 * self.freq_step;
+                let human_hear_end = next_general_end * EXP_BASE.powi(i_next as i32);
+
+                human_hear_end.ceil() // guarantee that end_freq > start_freq
+            };
+
+            *self.spline.get_mut(i as usize).unwrap().value = value;
         }
     }
 

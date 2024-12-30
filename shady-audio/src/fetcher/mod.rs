@@ -6,7 +6,7 @@ use cpal::{
 };
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
-use crate::{Data, DEFAULT_SAMPLE_RATE};
+use crate::{fft, Data, DEFAULT_SAMPLE_RATE};
 
 pub struct SystemAudio {
     data_snapshot: Arc<Mutex<AllocRingBuffer<f32>>>,
@@ -18,7 +18,7 @@ impl SystemAudio {
         device: Option<&cpal::Device>,
         stream_config_range: Option<&SupportedStreamConfigRange>,
         error_callback: E,
-    ) -> Box<Self>
+    ) -> (Box<Self>, SampleRate)
     where
         E: FnMut(StreamError) + Send + 'static,
     {
@@ -38,24 +38,21 @@ impl SystemAudio {
                 .config()
         };
 
+        let sample_rate = stream_config.sample_rate;
+
         let data_snapshot: Arc<Mutex<AllocRingBuffer<f32>>> =
-            Arc::new(Mutex::new(AllocRingBuffer::new(DEFAULT_SAMPLE_RATE)));
+            Arc::new(Mutex::new(AllocRingBuffer::new(crate::fft::FFT_INPUT_SIZE)));
 
         let stream = device
             .build_input_stream(
                 &stream_config,
                 {
                     let buffer = data_snapshot.clone();
-                    let amount_channels = stream_config.channels;
+                    debug_assert_eq!(stream_config.channels, 1);
 
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         let mut buf = buffer.lock().unwrap();
-
-                        let chunks = data
-                            .chunks_exact(amount_channels.into())
-                            .map(|chunk| chunk.iter().sum::<f32>() / amount_channels as f32);
-
-                        buf.extend(chunks);
+                        buf.extend(data.iter().cloned());
                     }
                 },
                 error_callback,
@@ -65,16 +62,18 @@ impl SystemAudio {
 
         stream.play().expect("Start listening to audio");
 
-        Box::new(Self {
+        let fetcher = Box::new(Self {
             _stream: stream,
             data_snapshot,
-        })
+        });
+
+        (fetcher, sample_rate)
     }
 }
 
 impl Data for SystemAudio {
     fn fetch_snapshot(&mut self, buf: &mut [f32]) {
-        debug_assert_eq!(buf.len(), DEFAULT_SAMPLE_RATE);
+        debug_assert_eq!(buf.len(), fft::FFT_INPUT_SIZE);
 
         let audio = self.data_snapshot.lock().unwrap();
 

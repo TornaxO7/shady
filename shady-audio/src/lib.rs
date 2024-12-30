@@ -47,7 +47,7 @@ trait Data {
 
 /// The main struct to interact with the crate.
 pub struct ShadyAudio {
-    fetch_buffer: Box<[f32; DEFAULT_SAMPLE_RATE]>,
+    fetch_buffer: Box<[f32; fft::FFT_INPUT_SIZE]>,
 
     fetcher: Box<dyn Data>,
     fft: FftCalculator,
@@ -70,11 +70,14 @@ impl ShadyAudio {
     where
         E: FnMut(StreamError) + Send + 'static,
     {
+        let (fetcher, sample_rate) =
+            SystemAudio::boxed(device, stream_config_range, error_callback);
+
         Self {
-            fetcher: SystemAudio::boxed(device, stream_config_range, error_callback),
+            fetcher,
             fft: FftCalculator::new(),
-            fetch_buffer: Box::new([0.; DEFAULT_SAMPLE_RATE]),
-            spline: FreqSpline::new(),
+            fetch_buffer: Box::new([0.; fft::FFT_INPUT_SIZE]),
+            spline: FreqSpline::new(sample_rate),
         }
     }
 
