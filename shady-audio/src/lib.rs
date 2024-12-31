@@ -34,7 +34,7 @@ mod timer;
 
 type Hz = usize;
 const START_FREQ: Hz = 50;
-const END_FREQ: Hz = 20_000;
+const END_FREQ: Hz = 15_000;
 
 use audio_spline::FreqSpline;
 use cpal::{StreamError, SupportedStreamConfigRange};

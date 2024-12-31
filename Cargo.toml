@@ -14,3 +14,4 @@ thiserror = "2"
 cpal = "0.15"
 realfft = "3.4"
 splines = "4"
+clap = { version = "4.5", features = ["derive", "cargo"] }
