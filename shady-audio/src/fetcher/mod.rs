@@ -7,8 +7,10 @@ use cpal::{
 
 use crate::{fft, Data, DEFAULT_SAMPLE_RATE};
 
+const BUFFER_SIZE: usize = fft::FFT_INPUT_SIZE;
+
 pub struct SystemAudio {
-    data_snapshot: Arc<Mutex<Vec<f32>>>,
+    data_buffer: Arc<Mutex<Vec<f32>>>,
     _stream: cpal::Stream,
 }
 
@@ -37,22 +39,35 @@ impl SystemAudio {
                 .config()
         };
 
-        let data_snapshot = Arc::new(Mutex::new(Vec::with_capacity(fft::FFT_INPUT_SIZE)));
+        let data_buffer = Arc::new(Mutex::new(Vec::with_capacity(BUFFER_SIZE)));
 
         let stream = device
             .build_input_stream(
                 &stream_config,
                 {
-                    let buffer = data_snapshot.clone();
-                    debug_assert_eq!(stream_config.channels, 1);
+                    let buffer = data_buffer.clone();
+                    debug_assert_eq!(
+                        stream_config.channels, 1,
+                        "We are currently only supporting 1 channel"
+                    );
 
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         let mut buf = buffer.lock().unwrap();
 
                         let buf_len = buf.len();
-                        buf.resize(buf_len + data.len(), 0.);
+                        // don't let the vec exceed the capacity
+                        let new_len = std::cmp::min(buf_len + data.len(), BUFFER_SIZE - 1);
+                        buf.resize(new_len, 0.);
+                        // prepare the space for the new data
+                        buf.copy_within(..buf_len, new_len - buf_len);
+                        // put the new data to the beginning of the vec
+                        buf[..data.len()].copy_from_slice(data);
 
-                        buf[buf_len..].copy_from_slice(data);
+                        debug_assert_eq!(
+                            buf.capacity(),
+                            BUFFER_SIZE,
+                            "The buffer should be fixed sized!"
+                        );
                     }
                 },
                 error_callback,
@@ -64,7 +79,7 @@ impl SystemAudio {
 
         let fetcher = Box::new(Self {
             _stream: stream,
-            data_snapshot,
+            data_buffer,
         });
 
         fetcher
@@ -73,7 +88,7 @@ impl SystemAudio {
 
 impl Data for SystemAudio {
     fn fetch_snapshot(&mut self, buf: &mut [f32]) {
-        let mut audio = self.data_snapshot.lock().unwrap();
+        let mut audio = self.data_buffer.lock().unwrap();
 
         // adjust buf
         let audio_len = audio.len();

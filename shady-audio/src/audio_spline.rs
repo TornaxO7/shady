@@ -109,7 +109,7 @@ fn check_equidistance(keys: &[Key<f32, f32>]) {
             let right_chunk = group[2].t - group[1].t;
             let left_chunk = group[1].t - group[0].t;
 
-            (right_chunk - left_chunk).abs() < 0.000001
+            (right_chunk - left_chunk).abs() < f32::EPSILON
         };
 
         debug_assert!(
@@ -124,7 +124,7 @@ fn check_1_0_point_exists(keys: &[Key<f32, f32>]) {
     let last_key = keys.last().unwrap();
 
     debug_assert!(
-        (1.0 - last_key.t) < 0.00001,
+        (1.0 - last_key.t) < f32::EPSILON,
         "Missing the last point at t = 1.0 of the spline. Keys:\n{:#?}",
         keys
     );
