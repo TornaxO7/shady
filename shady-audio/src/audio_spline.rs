@@ -87,10 +87,18 @@ impl<'a> Iterator for MagnitudeIterator<'a> {
                 None
             } else {
                 self.last_entry_calculated = true;
-                Some(self.magnitudes[prev..].iter().sum::<f32>() / (next - prev) as f32)
+                let max_magnitude = self.magnitudes[prev..]
+                    .iter()
+                    .fold(f32::MIN, |a, &b| a.max(b));
+
+                Some(max_magnitude)
             }
         } else {
-            Some(self.magnitudes[prev..next].iter().sum::<f32>() / (next - prev) as f32)
+            let max_magnitude = self.magnitudes[prev..next]
+                .iter()
+                .fold(f32::MIN, |a, &b| a.max(b));
+
+            Some(max_magnitude)
         }
     }
 }
