@@ -88,20 +88,14 @@ impl<'a> Iterator for MagnitudeIterator<'a> {
         let next_next = (prev as f32 * EXP_BASE * EXP_BASE) as usize;
 
         // if the second next range can't use its full range => use everything up
-        if next_next > END_FREQ {
-            let max_magnitude = self.magnitudes[prev..]
-                .iter()
-                .fold(f32::MIN, |a, &b| a.max(b));
-
+        let mag_range = if next_next > END_FREQ {
             self.reached_end = true;
-            Some(max_magnitude)
+            &self.magnitudes[prev..]
         } else {
-            let max_magnitude = self.magnitudes[prev..next]
-                .iter()
-                .fold(f32::MIN, |a, &b| a.max(b));
+            &self.magnitudes[prev..next]
+        };
 
-            Some(max_magnitude)
-        }
+        Some(mag_range.iter().fold(f32::MIN, |a, &b| a.max(b)))
     }
 }
 
