@@ -4,12 +4,11 @@ use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleFormat, SampleRate, StreamError, SupportedStreamConfigRange,
 };
-use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::{fft, Data, DEFAULT_SAMPLE_RATE};
 
 pub struct SystemAudio {
-    data_snapshot: Arc<Mutex<AllocRingBuffer<f32>>>,
+    data_snapshot: Arc<Mutex<Vec<f32>>>,
     _stream: cpal::Stream,
 }
 
@@ -38,8 +37,7 @@ impl SystemAudio {
                 .config()
         };
 
-        let data_snapshot: Arc<Mutex<AllocRingBuffer<f32>>> =
-            Arc::new(Mutex::new(AllocRingBuffer::new(crate::fft::FFT_INPUT_SIZE)));
+        let data_snapshot = Arc::new(Mutex::new(Vec::with_capacity(fft::FFT_INPUT_SIZE)));
 
         let stream = device
             .build_input_stream(
@@ -50,7 +48,11 @@ impl SystemAudio {
 
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         let mut buf = buffer.lock().unwrap();
-                        buf.extend(data.iter().cloned());
+
+                        let buf_len = buf.len();
+                        buf.resize(buf_len + data.len(), 0.);
+
+                        buf[buf_len..].copy_from_slice(data);
                     }
                 },
                 error_callback,
@@ -71,13 +73,17 @@ impl SystemAudio {
 
 impl Data for SystemAudio {
     fn fetch_snapshot(&mut self, buf: &mut [f32]) {
-        debug_assert_eq!(buf.len(), fft::FFT_INPUT_SIZE);
+        let mut audio = self.data_snapshot.lock().unwrap();
 
-        let audio = self.data_snapshot.lock().unwrap();
+        // adjust buf
+        let audio_len = audio.len();
+        let buf_len = buf.len();
+        let mid = std::cmp::min(audio_len, buf_len);
 
-        for (buf_val, &snap_val) in buf.iter_mut().zip(audio.iter()) {
-            *buf_val = snap_val;
-        }
+        buf.copy_within(..(buf_len - mid), mid);
+        buf[..mid].copy_from_slice(&audio);
+
+        audio.clear();
     }
 }
 

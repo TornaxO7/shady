@@ -2,10 +2,10 @@ use crate::{END_FREQ, START_FREQ};
 use realfft::{num_complex::Complex32, RealFftPlanner};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
-pub const FFT_INPUT_SIZE: usize = 44_100;
+pub const FFT_INPUT_SIZE: usize = 44_100; // > 44.100 Hz
 pub const FFT_OUTPUT_SIZE: usize = FFT_INPUT_SIZE / 2 + 1;
 
-const AMOUNT_HIGHEST_MAGNITUDES: usize = 10;
+const AMOUNT_HIGHEST_MAGNITUDES: usize = 1000 / 60;
 const GRAVITY_DECAY: f32 = 0.9;
 
 pub struct FftCalculator {

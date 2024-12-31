@@ -47,7 +47,7 @@ trait Data {
 
 /// The main struct to interact with the crate.
 pub struct ShadyAudio {
-    fetch_buffer: Box<[f32; fft::FFT_INPUT_SIZE]>,
+    fft_input: Box<[f32; fft::FFT_INPUT_SIZE]>,
 
     fetcher: Box<dyn Data>,
     fft: FftCalculator,
@@ -73,14 +73,14 @@ impl ShadyAudio {
         Self {
             fetcher: SystemAudio::boxed(device, stream_config_range, error_callback),
             fft: FftCalculator::new(),
-            fetch_buffer: Box::new([0.; fft::FFT_INPUT_SIZE]),
+            fft_input: Box::new([0.; fft::FFT_INPUT_SIZE]),
             spline: FreqSpline::new(),
         }
     }
 
     pub fn get_spline(&mut self) -> &FreqSpline {
         let magnitudes = {
-            let data_buf = self.fetch_buffer.as_mut_slice();
+            let data_buf = self.fft_input.as_mut_slice();
 
             self.fetcher.fetch_snapshot(data_buf);
             self.fft.process(data_buf)
