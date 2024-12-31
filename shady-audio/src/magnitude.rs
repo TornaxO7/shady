@@ -121,34 +121,33 @@ impl<T> DoubleBuffer<T> {
     }
 
     pub fn curr(&self) -> &[T] {
-        let offset = self.buf1_is_current as usize;
-        let start = self.capacity * offset;
-        let end = self.capacity * (1 + offset);
-
+        let (start, end) = self.start_and_end(self.buf1_is_current);
         &self.buffer[start..end]
     }
 
     pub fn prev(&self) -> &[T] {
-        let offset = !self.buf1_is_current as usize;
-        let start = self.capacity * offset;
-        let end = self.capacity * (1 + offset);
+        let (start, end) = self.start_and_end(!self.buf1_is_current);
 
         &self.buffer[start..end]
     }
 
     pub fn curr_mut(&mut self) -> &mut [T] {
-        let offset = self.buf1_is_current as usize;
-        let start = self.capacity * offset;
-        let end = self.capacity * (1 + offset);
+        let (start, end) = self.start_and_end(self.buf1_is_current);
 
         &mut self.buffer[start..end]
     }
 
     pub fn prev_mut(&mut self) -> &mut [T] {
-        let offset = !self.buf1_is_current as usize;
+        let (start, end) = self.start_and_end(!self.buf1_is_current);
+
+        &mut self.buffer[start..end]
+    }
+
+    fn start_and_end(&self, use_buf1: bool) -> (usize, usize) {
+        let offset = use_buf1 as usize;
         let start = self.capacity * offset;
         let end = self.capacity * (1 + offset);
 
-        &mut self.buffer[start..end]
+        (start, end)
     }
 }
