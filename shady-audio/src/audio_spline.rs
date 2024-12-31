@@ -7,7 +7,9 @@ const EXP_BASE: f32 = 1.06;
 ///
 /// It's a wrapper around [splines::Spline] and it's defined as (with mathematical notation of a function):
 ///
-///     FreqSpline: [0, 1] -> [0, 1]
+/// ```skip
+/// FreqSpline: [0, 1] -> [0, 1]
+/// ````
 ///
 /// So the whole input (which is the frequency in this case) range is mapped to `[0, 1]` as well as the output
 /// (which is the "presence" of the frequency).

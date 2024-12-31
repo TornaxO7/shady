@@ -118,7 +118,7 @@ impl SystemAudio {
     /// use shady_audio::{ShadyAudio, config::ShadyAudioConfig, fetcher::SystemAudioFetcher};
     ///
     /// fn main() {
-    ///     let shady = ShadyAudio::new(SystemAudioFetcher::new(), ShadyAudioConfig::default());
+    ///     let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)), ShadyAudioConfig::default());
     /// }
     /// ```
     pub fn default<E>(error_callback: E) -> Box<Self>
