@@ -1,59 +1,77 @@
-//! This crate takes care of catching audio and giving you the desired amount of magnitudes
-//! which are used for music visualizers for example.
+//! # Description
+//! A crate which simplifies the data management of audio sources to be easily able
+//! to retrieve the frequency powers of the source.
+//!
+//! ### [cpal]
+//!
+//! This crate also re-exports [cpal] so there's no need to add [cpal] exclusively
+//! to your dependency list.
+//!
+//! # How to get started
+//! You mainly interact with [ShadyAudio] and start there by clicking on the link.
 //!
 //! # Example
 //! This example basically contains the full API:
 //!
-//! ```no_run
+//! ```rust
 //! use std::num::NonZeroUsize;
 //!
-//! use shady_audio::ShadyAudio;
+//! use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
 //!
 //! fn main() {
-//!     // use the default output and the internal heuristic config
-//!     let mut audio = ShadyAudio::new(None, None, |err| panic!("{}", err));
+//!     let mut audio = {
+//!         let fetcher = DummyFetcher::boxed();
+//!         let config = ShadyAudioConfig::default();
 //!
-//!     // get the magnitudes with 10 entries
-//!     let magnitudes = audio.fetch_magnitudes(NonZeroUsize::new(10).unwrap());
-//!     assert_eq!(magnitudes.len(), 10);
+//!         ShadyAudio::new(fetcher, config)
+//!     };
 //!
-//!     // ... or in normalized form
-//!     let norm_magnitudes = audio.fetch_magnitudes_normalized(NonZeroUsize::new(10).unwrap());
-//!     for &norm_magn in norm_magnitudes {
-//!         assert!(0.0 <= norm_magn);
-//!         assert!(norm_magn <= 1.0);
-//!     }
-//!     assert_eq!(norm_magnitudes.len(), 10);
+//!     // Retrieve a spline which you can use, to get any points from the frequancy bands of your audio fetcher.
+//!     // `shady-audio` will take care of the rest. Let it be
+//!     //   - gravity effect
+//!     //   - smooth transition
+//!     //   - etc.
+//!     let spline = audio.get_spline();
+//!
+//!     // All relevant points of the spline are stored within the range [0, 1].
+//!     // Since we're currently using the [DummyFetcher] our spline equals the function `f(x) = 0`:
+//!     assert_eq!(spline.sample(0.0), Some(0.0));
+//!     assert_eq!(spline.sample(0.5), Some(0.0));
+//!     assert_eq!(spline.sample(1.0), Some(0.0));
+//!
+//!     // Any other value inside [0, 1] is fine:
+//!     assert_eq!(spline.sample(0.123456789), Some(0.0));
 //! }
 //! ```
+pub mod config;
+pub mod fetcher;
+
 mod audio_spline;
-mod fetcher;
 mod fft;
 mod magnitude;
 mod timer;
 
-type Hz = usize;
-const START_FREQ: Hz = 50;
-const END_FREQ: Hz = 15_000;
+pub use audio_spline::FreqSpline;
+pub use cpal;
 
-use audio_spline::FreqSpline;
-use cpal::{StreamError, SupportedStreamConfigRange};
-use fetcher::SystemAudio;
+use config::ShadyAudioConfig;
+use fetcher::Fetcher;
 use fft::FftCalculator;
 use magnitude::Magnitudes;
 use timer::Timer;
 
-const DEFAULT_SAMPLE_RATE: usize = fft::FFT_INPUT_SIZE;
+type Hz = usize;
 
-trait Data {
-    fn fetch_snapshot(&mut self, buf: &mut [f32]);
-}
+// The starting frequency from where the spline will collect/create its points.
+const START_FREQ: Hz = 20;
+// The ending frequency from where the spline will stop collecting/create its points.
+const END_FREQ: Hz = 15_000;
 
 /// The main struct to interact with the crate.
 pub struct ShadyAudio {
     fft_input: Box<[f32; fft::FFT_INPUT_SIZE]>,
 
-    fetcher: Box<dyn Data>,
+    fetcher: Box<dyn Fetcher>,
     fft: FftCalculator,
     spline: FreqSpline,
     magnitudes: Magnitudes,
@@ -62,27 +80,13 @@ pub struct ShadyAudio {
 }
 
 impl ShadyAudio {
-    pub fn default_with_callback<E>(error_callback: E) -> Self
-    where
-        E: FnMut(StreamError) + Send + 'static,
-    {
-        Self::new(None, None, error_callback)
-    }
-
-    pub fn new<E>(
-        device: Option<&cpal::Device>,
-        stream_config_range: Option<&SupportedStreamConfigRange>,
-        error_callback: E,
-    ) -> Self
-    where
-        E: FnMut(StreamError) + Send + 'static,
-    {
+    pub fn new(fetcher: Box<dyn Fetcher>, config: ShadyAudioConfig) -> Self {
         Self {
-            fetcher: SystemAudio::boxed(device, stream_config_range, error_callback),
+            fetcher,
             fft: FftCalculator::new(),
             fft_input: Box::new([0.; fft::FFT_INPUT_SIZE]),
             spline: FreqSpline::new(),
-            timer: Timer::new(),
+            timer: Timer::new(config.refresh_time),
             magnitudes: Magnitudes::new(),
         }
     }
@@ -101,5 +105,9 @@ impl ShadyAudio {
         self.spline.update(magnitudes);
 
         &self.spline
+    }
+
+    pub fn update_config(&mut self, config: ShadyAudioConfig) {
+        self.timer.set_refresh_time(config.refresh_time);
     }
 }

@@ -3,22 +3,34 @@ use splines::{Key, Spline};
 
 const EXP_BASE: f32 = 1.06;
 
+/// The spline which represents the audio with the frequency domain.
+///
+/// It's a wrapper around [splines::Spline] and it's defined as (with mathematical notation of a function):
+///
+///     FreqSpline: [0, 1] -> [0, 1]
+///
+/// So the whole input (which is the frequency in this case) range is mapped to `[0, 1]` as well as the output
+/// (which is the "presence" of the frequency).
+///
+/// # Usage
+/// You mostly want to use [FreqSpline::sample] or [FreqSpline::clamp_sample].
 pub struct FreqSpline {
     spline: Spline<f32, f32>,
 }
 
 impl FreqSpline {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let amount_points = {
             let dummy_magnitudes = [0.; fft::FFT_OUTPUT_SIZE];
             MagnitudeIterator::new(&dummy_magnitudes).count()
         };
 
+        // create the spline with equidistant points
         let spline = {
             let mut spline = Spline::from_vec(Vec::with_capacity(amount_points));
 
-            let step = 1. / (amount_points - 1) as f32; // `-1` in order to reach `1.`
-
+            // `-1` in order to for the last point to be at x = 1.
+            let step = 1. / (amount_points - 1) as f32;
             for i in 0..amount_points as usize {
                 let x = i as f32 * step;
                 let key = Key::new(x, 0.0, splines::Interpolation::Linear);
@@ -31,6 +43,7 @@ impl FreqSpline {
         {
             let keys = spline.keys();
 
+            check_t_range(keys);
             check_equidistance(keys);
             check_1_0_point_exists(keys);
         }
@@ -38,22 +51,27 @@ impl FreqSpline {
         Self { spline }
     }
 
-    pub fn update(&mut self, magnitudes: &[f32]) {
+    /// Updates the keys according to the magniudes.
+    pub(crate) fn update(&mut self, magnitudes: &[f32]) {
         debug_assert_eq!(magnitudes.len(), fft::FFT_OUTPUT_SIZE);
 
         let iterator = MagnitudeIterator::new(magnitudes);
 
         for (i, value) in iterator.enumerate() {
-            *self.spline.get_mut(i as usize).unwrap().value = value;
+            *self.spline.get_mut(i as usize).unwrap().value = value.min(1.0);
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.spline.is_empty()
-    }
-
+    /// Same as [splines::Spline::sample] but with the condition `0.0 <= t <= 1.0`.
+    /// Output is within the range `[0, 1]`.
     pub fn sample(&self, t: f32) -> Option<f32> {
         self.spline.sample(t)
+    }
+
+    /// Same as [splines::Spline::clamp_sample].
+    /// Output is within the range `[0, 1]`.
+    pub fn clamp_sample(&self, t: f32) -> Option<f32> {
+        self.spline.clamped_sample(t)
     }
 }
 
@@ -96,6 +114,18 @@ impl<'a> Iterator for MagnitudeIterator<'a> {
         };
 
         Some(mag_range.iter().fold(f32::MIN, |a, &b| a.max(b)))
+    }
+}
+
+#[cfg(debug_assertions)]
+fn check_t_range(keys: &[Key<f32, f32>]) {
+    for (i, key) in keys.iter().enumerate() {
+        assert!(
+            0.0 <= key.t && key.t <= 1.0,
+            "t value of key (key at index {}) is not within the [0, 1] interval: {}",
+            i,
+            key.t
+        );
     }
 }
 

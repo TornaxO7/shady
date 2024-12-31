@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Bar, BarChart, BarGroup},
     Frame,
 };
-use shady_audio::ShadyAudio;
+use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[derive(clap::Parser, Debug)]
@@ -31,7 +31,10 @@ fn main() -> std::io::Result<()> {
     let ctx = Ctx::parse();
 
     let mut terminal = ratatui::init();
-    let mut audio = ShadyAudio::default_with_callback(|err| panic!("{}", err));
+    let mut audio = ShadyAudio::new(
+        SystemAudioFetcher::default(|err| panic!("{}", err)),
+        ShadyAudioConfig::default(),
+    );
 
     loop {
         let window_size = crossterm::terminal::window_size()?;

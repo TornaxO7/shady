@@ -1,7 +1,5 @@
 use std::time::{Duration, Instant};
 
-const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
-
 #[derive(Debug, Clone)]
 pub struct Timer {
     refresh_time: Duration,
@@ -10,9 +8,9 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new() -> Self {
+    pub fn new(refresh_time: Duration) -> Self {
         Self {
-            refresh_time: DEFAULT_REFRESH_TIME,
+            refresh_time,
             last_time: Duration::from_secs(0),
             curr_time: Instant::now(),
         }
@@ -27,5 +25,9 @@ impl Timer {
             self.last_time = self.curr_time.elapsed();
             None
         }
+    }
+
+    pub fn set_refresh_time(&mut self, new_refresh_time: Duration) {
+        self.refresh_time = new_refresh_time;
     }
 }
