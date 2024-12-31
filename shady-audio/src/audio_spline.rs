@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::{fft, END_FREQ, START_FREQ};
 use splines::{Key, Spline};
 
@@ -18,14 +20,41 @@ const EXP_BASE: f32 = 1.06;
 /// You mostly want to use [FreqSpline::sample] or [FreqSpline::clamp_sample].
 pub struct FreqSpline {
     spline: Spline<f32, f32>,
+    ranges: Vec<Range<usize>>,
 }
 
 impl FreqSpline {
     pub(crate) fn new() -> Self {
-        let amount_points = {
-            let dummy_magnitudes = [0.; fft::FFT_OUTPUT_SIZE];
-            MagnitudeIterator::new(&dummy_magnitudes).count()
+        let ranges = {
+            let mut ranges = Vec::new();
+
+            let mut offset = 1;
+
+            loop {
+                let prev = (START_FREQ as f32 * EXP_BASE.powi(offset - 1)) as usize;
+                let next = (prev as f32 * EXP_BASE) as usize;
+                let next_next = (prev as f32 * EXP_BASE * EXP_BASE) as usize;
+
+                // if the second next range can't use its full range => use everything up
+                if next_next > END_FREQ {
+                    ranges.push(Range {
+                        start: prev,
+                        end: fft::FFT_OUTPUT_SIZE,
+                    });
+                    break;
+                } else {
+                    ranges.push(Range {
+                        start: prev,
+                        end: next,
+                    });
+                };
+                offset += 1;
+            }
+
+            ranges
         };
+
+        let amount_points = ranges.len();
 
         // create the spline with equidistant points
         let spline = {
@@ -50,17 +79,23 @@ impl FreqSpline {
             check_1_0_point_exists(keys);
         }
 
-        Self { spline }
+        Self { spline, ranges }
     }
 
     /// Updates the keys according to the magniudes.
     pub(crate) fn update(&mut self, magnitudes: &[f32]) {
-        debug_assert_eq!(magnitudes.len(), fft::FFT_OUTPUT_SIZE);
+        debug_assert_eq!(magnitudes.len(), fft::FFT_OUTPUT_SIZE,
+            concat![
+                "Current implementation assumes that magnitudes equals the length of the fft output size.\n",
+                "One reason is, that we precompute the indexes (see self.ranges) which might be wrong if the magnitude length is different"
+            ]
+        );
 
-        let iterator = MagnitudeIterator::new(magnitudes);
-
-        for (i, value) in iterator.enumerate() {
-            *self.spline.get_mut(i as usize).unwrap().value = value.min(1.0);
+        for (i, range) in self.ranges.iter().enumerate() {
+            let value = magnitudes[range.clone()]
+                .iter()
+                .fold(f32::MIN, |a, &b| a.max(b));
+            *self.spline.get_mut(i).unwrap().value = value.min(1.0);
         }
     }
 
@@ -74,48 +109,6 @@ impl FreqSpline {
     /// Output is within the range `[0, 1]`.
     pub fn clamp_sample(&self, t: f32) -> Option<f32> {
         self.spline.clamped_sample(t)
-    }
-}
-
-struct MagnitudeIterator<'a> {
-    magnitudes: &'a [f32],
-
-    reached_end: bool,
-    offset: i32,
-}
-
-impl<'a> MagnitudeIterator<'a> {
-    pub fn new(magnitudes: &'a [f32]) -> Self {
-        Self {
-            magnitudes,
-            offset: 0,
-            reached_end: false,
-        }
-    }
-}
-
-impl<'a> Iterator for MagnitudeIterator<'a> {
-    type Item = f32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.reached_end {
-            return None;
-        }
-
-        self.offset += 1;
-        let prev = (START_FREQ as f32 * EXP_BASE.powi(self.offset - 1)) as usize;
-        let next = (prev as f32 * EXP_BASE) as usize;
-        let next_next = (prev as f32 * EXP_BASE * EXP_BASE) as usize;
-
-        // if the second next range can't use its full range => use everything up
-        let mag_range = if next_next > END_FREQ {
-            self.reached_end = true;
-            &self.magnitudes[prev..]
-        } else {
-            &self.magnitudes[prev..next]
-        };
-
-        Some(mag_range.iter().fold(f32::MIN, |a, &b| a.max(b)))
     }
 }
 

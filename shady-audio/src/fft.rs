@@ -1,6 +1,6 @@
 use realfft::{num_complex::Complex32, RealFftPlanner};
 
-pub const FFT_INPUT_SIZE: usize = 44_100; // > 44.100 Hz
+pub const FFT_INPUT_SIZE: usize = 44_100; // >= 44.100 Hz
 pub const FFT_OUTPUT_SIZE: usize = FFT_INPUT_SIZE / 2 + 1;
 
 pub struct FftCalculator {
