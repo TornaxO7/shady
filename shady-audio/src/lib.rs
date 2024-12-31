@@ -39,7 +39,7 @@ use cpal::{StreamError, SupportedStreamConfigRange};
 use fetcher::SystemAudio;
 use fft::FftCalculator;
 
-const DEFAULT_SAMPLE_RATE: usize = fft::FFT_INPUT_SIZE * 2;
+const DEFAULT_SAMPLE_RATE: usize = fft::FFT_INPUT_SIZE;
 
 trait Data {
     fn fetch_snapshot(&mut self, buf: &mut [f32]);
@@ -70,14 +70,11 @@ impl ShadyAudio {
     where
         E: FnMut(StreamError) + Send + 'static,
     {
-        let (fetcher, sample_rate) =
-            SystemAudio::boxed(device, stream_config_range, error_callback);
-
         Self {
-            fetcher,
+            fetcher: SystemAudio::boxed(device, stream_config_range, error_callback),
             fft: FftCalculator::new(),
             fetch_buffer: Box::new([0.; fft::FFT_INPUT_SIZE]),
-            spline: FreqSpline::new(sample_rate),
+            spline: FreqSpline::new(),
         }
     }
 

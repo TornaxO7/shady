@@ -18,7 +18,7 @@ impl SystemAudio {
         device: Option<&cpal::Device>,
         stream_config_range: Option<&SupportedStreamConfigRange>,
         error_callback: E,
-    ) -> (Box<Self>, SampleRate)
+    ) -> Box<Self>
     where
         E: FnMut(StreamError) + Send + 'static,
     {
@@ -37,8 +37,6 @@ impl SystemAudio {
                 .unwrap_or_else(|| todo!("We currently support only stream configs which are able to provide a sample rate of 44.100Hz."))
                 .config()
         };
-
-        let sample_rate = stream_config.sample_rate;
 
         let data_snapshot: Arc<Mutex<AllocRingBuffer<f32>>> =
             Arc::new(Mutex::new(AllocRingBuffer::new(crate::fft::FFT_INPUT_SIZE)));
@@ -67,7 +65,7 @@ impl SystemAudio {
             data_snapshot,
         });
 
-        (fetcher, sample_rate)
+        fetcher
     }
 }
 

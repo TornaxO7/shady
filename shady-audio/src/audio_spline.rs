@@ -1,34 +1,21 @@
 use crate::{fft, START_FREQ};
-use cpal::SampleRate;
 use splines::{Key, Spline};
 
 const EXP_BASE: f32 = 1.06;
 
 pub struct FreqSpline {
     spline: Spline<f32, f32>,
-    freq_step: f32,
-    amount_points: usize,
 }
 
 impl FreqSpline {
-    pub fn new(sample_rate: SampleRate) -> Self {
-        let freq_step = sample_rate.0 as f32 / fft::FFT_INPUT_SIZE as f32;
-
+    pub fn new() -> Self {
         let amount_points = {
-            let mut counter: usize = 0;
-            let mut end_freq = (START_FREQ as f32 + freq_step) * EXP_BASE;
-
-            while end_freq < fft::FFT_OUTPUT_SIZE as f32 {
-                counter += 1;
-                end_freq = (START_FREQ as f32 + counter as f32 * freq_step)
-                    * EXP_BASE.powi(counter as i32);
-            }
-
-            counter
+            let dummy_magnitudes = [0.; fft::FFT_OUTPUT_SIZE];
+            MagnitudeIterator::new(&dummy_magnitudes).count()
         };
 
         let spline = {
-            let mut spline = Spline::from_vec(vec![]);
+            let mut spline = Spline::from_vec(Vec::with_capacity(amount_points));
 
             let step = 1. / (amount_points - 1) as f32; // `-1` in order to reach `1.`
 
@@ -40,35 +27,23 @@ impl FreqSpline {
             spline
         };
 
-        Self {
-            spline,
-            amount_points,
-            freq_step,
+        #[cfg(debug_assertions)]
+        {
+            let keys = spline.keys();
+
+            check_equidistance(keys);
+            check_1_0_point_exists(keys);
         }
+
+        Self { spline }
     }
 
     pub fn update(&mut self, magnitudes: &[f32]) {
         debug_assert_eq!(magnitudes.len(), fft::FFT_OUTPUT_SIZE);
 
-        let mut start_freq = START_FREQ as f32;
-        let mut end_freq = (start_freq + self.freq_step) * EXP_BASE;
+        let iterator = MagnitudeIterator::new(magnitudes);
 
-        for i in 0..self.amount_points {
-            let start = start_freq as usize;
-            let end = end_freq as usize;
-
-            let value = magnitudes[start..end].iter().sum::<f32>() / (end - start) as f32;
-
-            start_freq = end_freq;
-            end_freq = {
-                let i_next = i + 1;
-
-                let next_general_end = (START_FREQ as f32) + i_next as f32 * self.freq_step;
-                let human_hear_end = next_general_end * EXP_BASE.powi(i_next as i32);
-
-                human_hear_end.ceil() // guarantee that end_freq > start_freq
-            };
-
+        for (i, value) in iterator.enumerate() {
             *self.spline.get_mut(i as usize).unwrap().value = value;
         }
     }
@@ -80,4 +55,69 @@ impl FreqSpline {
     pub fn sample(&self, t: f32) -> Option<f32> {
         self.spline.sample(t)
     }
+}
+
+struct MagnitudeIterator<'a> {
+    magnitudes: &'a [f32],
+
+    last_entry_calculated: bool,
+    offset: i32,
+}
+
+impl<'a> MagnitudeIterator<'a> {
+    pub fn new(magnitudes: &'a [f32]) -> Self {
+        Self {
+            magnitudes,
+            offset: 0,
+            last_entry_calculated: false,
+        }
+    }
+}
+
+impl<'a> Iterator for MagnitudeIterator<'a> {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.offset += 1;
+        let prev = (START_FREQ as f32 * EXP_BASE.powi(self.offset - 1)) as usize;
+        let next = (prev as f32 * EXP_BASE) as usize;
+
+        if next > self.magnitudes.len() {
+            if self.last_entry_calculated {
+                None
+            } else {
+                self.last_entry_calculated = true;
+                Some(self.magnitudes[prev..].iter().sum::<f32>() / (next - prev) as f32)
+            }
+        } else {
+            Some(self.magnitudes[prev..next].iter().sum::<f32>() / (next - prev) as f32)
+        }
+    }
+}
+
+fn check_equidistance(keys: &[Key<f32, f32>]) {
+    for (i, group) in keys.chunks_exact(3).enumerate() {
+        let distance_is_same = {
+            let right_chunk = group[2].t - group[1].t;
+            let left_chunk = group[1].t - group[0].t;
+
+            (right_chunk - left_chunk).abs() < 0.000001
+        };
+
+        debug_assert!(
+            distance_is_same,
+            "Spline points are not equidistant starting from: {}. Keys:\n{:#?}",
+            i, keys
+        );
+    }
+}
+
+fn check_1_0_point_exists(keys: &[Key<f32, f32>]) {
+    let last_key = keys.last().unwrap();
+
+    debug_assert!(
+        (1.0 - last_key.t) < 0.00001,
+        "Missing the last point at t = 1.0 of the spline. Keys:\n{:#?}",
+        keys
+    );
 }
