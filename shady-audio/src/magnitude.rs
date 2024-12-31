@@ -127,19 +127,16 @@ impl<T> DoubleBuffer<T> {
 
     pub fn prev(&self) -> &[T] {
         let (start, end) = self.start_and_end(!self.buf1_is_current);
-
         &self.buffer[start..end]
     }
 
     pub fn curr_mut(&mut self) -> &mut [T] {
         let (start, end) = self.start_and_end(self.buf1_is_current);
-
         &mut self.buffer[start..end]
     }
 
     pub fn prev_mut(&mut self) -> &mut [T] {
         let (start, end) = self.start_and_end(!self.buf1_is_current);
-
         &mut self.buffer[start..end]
     }
 
