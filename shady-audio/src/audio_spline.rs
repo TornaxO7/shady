@@ -1,4 +1,4 @@
-use crate::{fft, START_FREQ};
+use crate::{fft, END_FREQ, START_FREQ};
 use splines::{Key, Spline};
 
 const EXP_BASE: f32 = 1.06;
@@ -60,7 +60,7 @@ impl FreqSpline {
 struct MagnitudeIterator<'a> {
     magnitudes: &'a [f32],
 
-    last_entry_calculated: bool,
+    reached_end: bool,
     offset: i32,
 }
 
@@ -69,7 +69,7 @@ impl<'a> MagnitudeIterator<'a> {
         Self {
             magnitudes,
             offset: 0,
-            last_entry_calculated: false,
+            reached_end: false,
         }
     }
 }
@@ -78,21 +78,23 @@ impl<'a> Iterator for MagnitudeIterator<'a> {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.reached_end {
+            return None;
+        }
+
         self.offset += 1;
         let prev = (START_FREQ as f32 * EXP_BASE.powi(self.offset - 1)) as usize;
         let next = (prev as f32 * EXP_BASE) as usize;
+        let next_next = (prev as f32 * EXP_BASE * EXP_BASE) as usize;
 
-        if next > self.magnitudes.len() {
-            if self.last_entry_calculated {
-                None
-            } else {
-                self.last_entry_calculated = true;
-                let max_magnitude = self.magnitudes[prev..]
-                    .iter()
-                    .fold(f32::MIN, |a, &b| a.max(b));
+        // if the second next range can't use its full range => use everything up
+        if next_next > END_FREQ {
+            let max_magnitude = self.magnitudes[prev..]
+                .iter()
+                .fold(f32::MIN, |a, &b| a.max(b));
 
-                Some(max_magnitude)
-            }
+            self.reached_end = true;
+            Some(max_magnitude)
         } else {
             let max_magnitude = self.magnitudes[prev..next]
                 .iter()
