@@ -7,7 +7,7 @@ description = "A high level library build upon cpal to retrieve audio for visual
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/TornaxO7/shady"
 documentation = "https://docs.rs/shady-audio"
-repository = "https://github.com/TornaxO7/shady"
+repository = "https://github.com/TornaxO7/shady/tree/main/shady-audio"
 
 [dependencies]
 splines.workspace = true
