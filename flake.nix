@@ -55,8 +55,9 @@
                 rust-toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
               in
               pkgs.mkShell rec {
-                packages = [ rust-toolchain inputs.cargo-watchdoc.packages.${system}.default ];
-                buildInputs = dependencies ++ (with pkgs; [ cargo-flamegraph ]);
+                packages = [ rust-toolchain inputs.cargo-watchdoc.packages.${system}.default ]
+                  ++ (with pkgs; [ cargo-flamegraph cargo-release ]);
+                buildInputs = dependencies;
 
                 shellHook = ''
                   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${lib.makeLibraryPath buildInputs}
