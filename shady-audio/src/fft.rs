@@ -66,10 +66,10 @@ impl FftCalculator {
         self.magnitudes.as_ref()
     }
 
-    fn calc_fft(&mut self, data: &mut [f32]) {
+    fn calc_fft(&mut self, data: &[f32]) {
         let fft = self.planner.plan_fft_forward(FFT_INPUT_SIZE);
         fft.process_with_scratch(
-            data,
+            &mut data.to_vec(),
             self.fft_output.as_mut_slice(),
             self.scratch_buffer.as_mut_slice(),
         )
