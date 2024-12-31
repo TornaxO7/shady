@@ -14,3 +14,4 @@ tracing.workspace = true
 
 ringbuffer = "0.15.0"
 apodize = "1"
+simple-easing = "1"

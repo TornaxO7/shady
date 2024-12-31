@@ -103,6 +103,7 @@ impl<'a> Iterator for MagnitudeIterator<'a> {
     }
 }
 
+#[cfg(debug_assertions)]
 fn check_equidistance(keys: &[Key<f32, f32>]) {
     for (i, group) in keys.chunks_exact(3).enumerate() {
         let distance_is_same = {
@@ -120,6 +121,7 @@ fn check_equidistance(keys: &[Key<f32, f32>]) {
     }
 }
 
+#[cfg(debug_assertions)]
 fn check_1_0_point_exists(keys: &[Key<f32, f32>]) {
     let last_key = keys.last().unwrap();
 

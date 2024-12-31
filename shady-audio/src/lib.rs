@@ -29,15 +29,19 @@
 mod audio_spline;
 mod fetcher;
 mod fft;
+mod magnitude;
+mod timer;
 
 type Hz = usize;
-const START_FREQ: Hz = 20;
-const END_FREQ: Hz = 20_000;
+const START_FREQ: Hz = 50;
+const END_FREQ: Hz = 15_000;
 
 use audio_spline::FreqSpline;
 use cpal::{StreamError, SupportedStreamConfigRange};
 use fetcher::SystemAudio;
 use fft::FftCalculator;
+use magnitude::Magnitudes;
+use timer::Timer;
 
 const DEFAULT_SAMPLE_RATE: usize = fft::FFT_INPUT_SIZE;
 
@@ -52,6 +56,9 @@ pub struct ShadyAudio {
     fetcher: Box<dyn Data>,
     fft: FftCalculator,
     spline: FreqSpline,
+    magnitudes: Magnitudes,
+
+    timer: Timer,
 }
 
 impl ShadyAudio {
@@ -75,17 +82,22 @@ impl ShadyAudio {
             fft: FftCalculator::new(),
             fft_input: Box::new([0.; fft::FFT_INPUT_SIZE]),
             spline: FreqSpline::new(),
+            timer: Timer::new(),
+            magnitudes: Magnitudes::new(),
         }
     }
 
     pub fn get_spline(&mut self) -> &FreqSpline {
-        let magnitudes = {
-            let data_buf = self.fft_input.as_mut_slice();
+        let magnitudes = match self.timer.ease_time() {
+            Some(ease_time) => self.magnitudes.update_with_ease(ease_time),
+            None => {
+                let data_buf = self.fft_input.as_mut_slice();
 
-            self.fetcher.fetch_snapshot(data_buf);
-            self.fft.process(data_buf)
+                self.fetcher.fetch_snapshot(data_buf);
+                let fft_out = self.fft.process(data_buf);
+                self.magnitudes.update_magnitudes(fft_out)
+            }
         };
-
         self.spline.update(magnitudes);
 
         &self.spline
