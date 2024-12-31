@@ -1,7 +1,6 @@
 use crate::{fft, START_FREQ};
 use cpal::SampleRate;
 use splines::{Key, Spline};
-use tracing::debug;
 
 const EXP_BASE: f32 = 1.06;
 

@@ -39,7 +39,7 @@ use cpal::{StreamError, SupportedStreamConfigRange};
 use fetcher::SystemAudio;
 use fft::FftCalculator;
 
-const DEFAULT_SAMPLE_RATE: usize = 44_100;
+const DEFAULT_SAMPLE_RATE: usize = fft::FFT_INPUT_SIZE * 2;
 
 trait Data {
     fn fetch_snapshot(&mut self, buf: &mut [f32]);
