@@ -81,6 +81,16 @@ pub struct ShadyAudio {
 }
 
 impl ShadyAudio {
+    /// Create a new instance of this struct by providing the (audio) fetcher and the config.
+    ///
+    /// # Example
+    /// ```
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    ///
+    /// fn main() {
+    ///     let shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
+    /// }
+    /// ```
     pub fn new(fetcher: Box<dyn Fetcher>, config: ShadyAudioConfig) -> Self {
         Self {
             fetcher,
@@ -92,6 +102,9 @@ impl ShadyAudio {
         }
     }
 
+    /// Returns you the latest "frequency spline" which describes the presence of each frequency.
+    /// The spline basically represents the curve of audio visualizers which are using a bar chart
+    /// like [`shady-cli`](https://github.com/TornaxO7/shady/tree/main/shady-cli).
     pub fn get_spline(&mut self) -> &FreqSpline {
         let magnitudes = match self.timer.ease_time() {
             Some(ease_time) => self.magnitudes.update_with_ease(ease_time),
@@ -108,6 +121,7 @@ impl ShadyAudio {
         &self.spline
     }
 
+    /// Let's you update the internal config if you'd like to change something.
     pub fn update_config(&mut self, config: ShadyAudioConfig) {
         self.timer.set_refresh_time(config.refresh_time);
     }
