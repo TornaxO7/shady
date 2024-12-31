@@ -5,6 +5,7 @@ use crate::{END_FREQ, START_FREQ};
 
 const BUFFER_SIZE: usize = crate::fft::FFT_OUTPUT_SIZE;
 const AMOUNT_HIGHEST_MAGNITUDES: usize = 4;
+const GRAVITY_VAL: f32 = 0.95;
 
 #[derive(Debug)]
 pub struct Magnitudes {
@@ -49,7 +50,7 @@ impl Magnitudes {
         let curr = self.buffers.curr();
 
         for (i, mag) in self.magnitude_out.iter_mut().enumerate() {
-            *mag = (1. - t) * prev[i] + t * curr[i];
+            *mag = ((1. - t) * prev[i] + t * curr[i]) * GRAVITY_VAL;
         }
 
         self.magnitude_out.as_ref()
