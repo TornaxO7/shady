@@ -96,9 +96,9 @@ impl Magnitudes {
 
 #[derive(Debug)]
 struct DoubleBuffer<T> {
-    buffer1: Box<[T]>,
-    buffer2: Box<[T]>,
+    buffer: Box<[T]>,
 
+    capacity: usize,
     buf1_is_current: bool,
 }
 
@@ -107,12 +107,11 @@ impl<T> DoubleBuffer<T> {
     where
         T: Copy,
     {
-        let buffer1 = vec![val; capacity].into_boxed_slice();
-        let buffer2 = buffer1.clone();
+        let buffer = vec![val; capacity * 2].into_boxed_slice();
 
         Self {
-            buffer1,
-            buffer2,
+            buffer,
+            capacity,
             buf1_is_current: true,
         }
     }
@@ -122,34 +121,34 @@ impl<T> DoubleBuffer<T> {
     }
 
     pub fn curr(&self) -> &[T] {
-        if self.buf1_is_current {
-            &self.buffer1
-        } else {
-            &self.buffer2
-        }
+        let offset = self.buf1_is_current as usize;
+        let start = self.capacity * offset;
+        let end = self.capacity * (1 + offset);
+
+        &self.buffer[start..end]
     }
 
     pub fn prev(&self) -> &[T] {
-        if self.buf1_is_current {
-            &self.buffer2
-        } else {
-            &self.buffer1
-        }
+        let offset = !self.buf1_is_current as usize;
+        let start = self.capacity * offset;
+        let end = self.capacity * (1 + offset);
+
+        &self.buffer[start..end]
     }
 
     pub fn curr_mut(&mut self) -> &mut [T] {
-        if self.buf1_is_current {
-            self.buffer1.as_mut()
-        } else {
-            self.buffer2.as_mut()
-        }
+        let offset = self.buf1_is_current as usize;
+        let start = self.capacity * offset;
+        let end = self.capacity * (1 + offset);
+
+        &mut self.buffer[start..end]
     }
 
     pub fn prev_mut(&mut self) -> &mut [T] {
-        if self.buf1_is_current {
-            self.buffer2.as_mut()
-        } else {
-            self.buffer1.as_mut()
-        }
+        let offset = !self.buf1_is_current as usize;
+        let start = self.capacity * offset;
+        let end = self.capacity * (1 + offset);
+
+        &mut self.buffer[start..end]
     }
 }
