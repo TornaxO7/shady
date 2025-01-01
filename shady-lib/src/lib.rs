@@ -1,5 +1,5 @@
-mod frontend;
 mod resources;
+mod shader_language;
 mod vertices;
 
 use resources::Resources;
@@ -7,8 +7,8 @@ use std::borrow::Cow;
 use tracing::instrument;
 use wgpu::Device;
 
-pub use frontend::{Frontend, GlslFrontend, WgslFrontend};
 pub use resources::MouseState;
+pub use shader_language::{Glsl, ShaderLanguage, Wgsl};
 pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
 
 #[derive(thiserror::Error, Debug)]
@@ -27,14 +27,14 @@ pub enum Error {
     InvalidGlslFragmentShader(String),
 }
 
-pub struct Shady<F: Frontend> {
+pub struct Shady<F: ShaderLanguage> {
     resources: Resources,
     pub bind_group: wgpu::BindGroup,
     frontend: F,
 }
 
 // General functions
-impl<F: Frontend> Shady<F> {
+impl<F: ShaderLanguage> Shady<F> {
     #[instrument(level = "trace")]
     pub fn new(device: &Device) -> Self {
         let resources = Resources::new(device);
@@ -120,7 +120,7 @@ impl<F: Frontend> Shady<F> {
 }
 
 /// Updating functions
-impl<F: Frontend> Shady<F> {
+impl<F: ShaderLanguage> Shady<F> {
     pub fn update_resolution(&mut self, width: u32, height: u32) {
         self.resources.resolution.update_resolution(width, height);
     }

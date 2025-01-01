@@ -2,6 +2,7 @@ mod cli;
 mod frontend;
 mod logger;
 mod renderer;
+mod states;
 
 use std::{
     path::{Path, PathBuf},
@@ -87,11 +88,11 @@ fn start_app(fragment_path: PathBuf, frontend: ShaderLanguage) -> Result<()> {
 
     match frontend {
         ShaderLanguage::Wgsl => {
-            let mut renderer = Renderer::<shady::WgslFrontend>::new(fragment_path)?;
+            let mut renderer = Renderer::<shady::Wgsl>::new(fragment_path)?;
             event_loop.run_app(&mut renderer)?;
         }
         ShaderLanguage::Glsl => {
-            let mut renderer = Renderer::<shady::GlslFrontend>::new(fragment_path)?;
+            let mut renderer = Renderer::<shady::Glsl>::new(fragment_path)?;
             event_loop.run_app(&mut renderer)?;
         }
     }

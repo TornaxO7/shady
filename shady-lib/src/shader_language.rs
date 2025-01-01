@@ -1,22 +1,22 @@
 use tracing::instrument;
 use wgpu::naga::{front::glsl::Options, ShaderStage};
 
-pub trait Frontend {
+pub trait ShaderLanguage {
     fn new() -> Self;
 
     fn parse(&mut self, fragment_shader: &str) -> Result<wgpu::naga::Module, crate::Error>;
 }
 
-pub struct WgslFrontend(wgpu::naga::front::wgsl::Frontend);
+pub struct Wgsl(wgpu::naga::front::wgsl::Frontend);
 
-impl WgslFrontend {
+impl Wgsl {
     #[instrument(level = "trace")]
     pub fn new() -> Self {
         Self(wgpu::naga::front::wgsl::Frontend::new())
     }
 }
 
-impl Frontend for WgslFrontend {
+impl ShaderLanguage for Wgsl {
     #[instrument(level = "trace")]
     fn new() -> Self {
         Self::new()
@@ -40,16 +40,16 @@ impl Frontend for WgslFrontend {
     }
 }
 
-pub struct GlslFrontend(wgpu::naga::front::glsl::Frontend);
+pub struct Glsl(wgpu::naga::front::glsl::Frontend);
 
-impl GlslFrontend {
+impl Glsl {
     #[instrument(level = "trace")]
     pub fn new() -> Self {
         Self(wgpu::naga::front::glsl::Frontend::default())
     }
 }
 
-impl Frontend for GlslFrontend {
+impl ShaderLanguage for Glsl {
     #[instrument(level = "trace")]
     fn new() -> Self {
         Self::new()

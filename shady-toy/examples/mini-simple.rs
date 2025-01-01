@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use pollster::FutureExt;
-use shady::{Shady, WgslFrontend};
+use shady::{Shady, Wgsl};
 use wgpu::{
     Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, TextureViewDescriptor,
 };
@@ -23,7 +23,7 @@ struct State<'a> {
     config: SurfaceConfiguration,
     window: Arc<Window>,
     // SHADY
-    shady: Shady<WgslFrontend>,
+    shady: Shady<Wgsl>,
 
     vbuffer: wgpu::Buffer,
     ibuffer: wgpu::Buffer,

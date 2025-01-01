@@ -2324,15 +2324,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shady-renderer"
-version = "0.1.0"
-dependencies = [
- "shady-audio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "shady-toy"
 version = "0.1.0"
 dependencies = [
