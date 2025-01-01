@@ -154,11 +154,6 @@ impl<'a> State<'a> {
         self.shady
             .update_resolution(new_size.width, new_size.height);
     }
-
-    pub fn cleanup(&mut self) {
-        // SHADY
-        self.shady.cleanup();
-    }
 }
 
 struct App<'a> {
@@ -200,10 +195,6 @@ impl<'a> ApplicationHandler<()> for App<'a> {
             WindowEvent::KeyboardInput { event, .. }
                 if event.logical_key.to_text() == Some("q") =>
             {
-                if let Some(state) = &mut self.state {
-                    state.cleanup();
-                }
-
                 event_loop.exit();
             }
             _ => (),
