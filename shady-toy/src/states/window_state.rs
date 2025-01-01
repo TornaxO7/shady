@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
 use pollster::FutureExt;
-use shady::ShaderLanguage;
+use shady::{ShaderLanguage, Shady, ShadyDescriptor};
 use tracing::trace;
 use wgpu::{
     Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, TextureViewDescriptor,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
-use super::{inner::InnerState, RenderState};
+use super::{SHADY_BIND_GROUP_INDEX, SHADY_VERTEX_BUFFER_INDEX};
+
+use super::RenderState;
 
 pub struct WindowState<'a, S: ShaderLanguage> {
     surface: Surface<'a>,
@@ -16,7 +18,7 @@ pub struct WindowState<'a, S: ShaderLanguage> {
     queue: Queue,
     config: SurfaceConfiguration,
     window: Arc<Window>,
-    inner: InnerState<S>,
+    pub shady: Shady<S>,
 }
 
 impl<'a, S: ShaderLanguage> WindowState<'a, S> {
@@ -49,7 +51,7 @@ impl<'a, S: ShaderLanguage> WindowState<'a, S> {
             .block_on()
             .expect("Retrieve device and queue");
 
-        let (config, inner) = {
+        let (config, shady) = {
             let surface_caps = surface.get_capabilities(&adapter);
             let surface_format = surface_caps
                 .formats
@@ -71,9 +73,15 @@ impl<'a, S: ShaderLanguage> WindowState<'a, S> {
                 desired_maximum_frame_latency: 2,
             };
 
-            let inner = InnerState::new(&device, fragment_code, surface_format)?;
+            let shady = Shady::new(&ShadyDescriptor {
+                device: &device,
+                fragment_shader: fragment_code,
+                texture_format: surface_format,
+                bind_group_index: SHADY_BIND_GROUP_INDEX,
+                vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
+            })?;
 
-            (config, inner)
+            (config, shady)
         };
 
         Ok(Self {
@@ -82,7 +90,7 @@ impl<'a, S: ShaderLanguage> WindowState<'a, S> {
             queue,
             config,
             window,
-            inner,
+            shady,
         })
     }
 
@@ -92,7 +100,8 @@ impl<'a, S: ShaderLanguage> WindowState<'a, S> {
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.inner.resize(new_size.width, new_size.height);
+            self.shady
+                .update_resolution(new_size.width, new_size.height);
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
@@ -102,7 +111,7 @@ impl<'a, S: ShaderLanguage> WindowState<'a, S> {
 
 impl<'a, S: ShaderLanguage> RenderState<S> for WindowState<'a, S> {
     fn prepare_next_frame(&mut self) {
-        self.inner.prepare_next_frame(&mut self.queue);
+        self.shady.prepare_next_frame(&mut self.queue);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -117,7 +126,7 @@ impl<'a, S: ShaderLanguage> RenderState<S> for WindowState<'a, S> {
                 label: Some("WindowState render encoder"),
             });
 
-        self.inner.apply_renderpass(&mut encoder, &view);
+        self.shady.add_render_pass(&mut encoder, &view);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
@@ -126,10 +135,7 @@ impl<'a, S: ShaderLanguage> RenderState<S> for WindowState<'a, S> {
     }
 
     fn update_pipeline(&mut self, fragment_code: &str) -> Result<(), shady::Error> {
-        self.inner.update_pipeline(&self.device, fragment_code)
-    }
-
-    fn shady_mut(&mut self) -> &mut shady::Shady<S> {
-        &mut self.inner.shady
+        self.shady
+            .update_render_pipeline(&self.device, fragment_code)
     }
 }

@@ -104,7 +104,7 @@ impl<'a> State<'a> {
         // SHADY
         let pipeline = self
             .shady
-            .get_render_pipeline(&self.device, FRAGMENT_SHADER, &self.config.format)
+            .update_render_pipeline(&self.device, FRAGMENT_SHADER, &self.config.format)
             .unwrap();
 
         let output = self.surface.get_current_texture().unwrap();

@@ -2,11 +2,13 @@
 mod tests {
     use image::{ImageBuffer, Rgba};
     use pollster::FutureExt;
-    use shady::{ShaderLanguage, Wgsl};
-    use wgpu::{Backends, Buffer, BufferView, Device, DeviceDescriptor, Instance, Queue, Texture};
+    use shady::{ShaderLanguage, Shady, ShadyDescriptor, Wgsl};
+    use wgpu::{
+        Backends, Buffer, BufferView, Device, DeviceDescriptor, Extent3d, Instance, Queue, Texture,
+    };
     use winit::dpi::PhysicalSize;
 
-    use super::super::{inner::InnerState, RenderState};
+    use crate::states::{RenderState, SHADY_BIND_GROUP_INDEX, SHADY_VERTEX_BUFFER_INDEX};
 
     type Bytes = u32;
 
@@ -18,11 +20,11 @@ mod tests {
         size: PhysicalSize<u32>,
         texture: Texture,
         output_buffer: Buffer,
-        texture_extent: wgpu::Extent3d,
+        texture_extent: Extent3d,
 
         device: Device,
         queue: Queue,
-        inner: InnerState<S>,
+        shady: Shady<S>,
     }
 
     impl<S: ShaderLanguage> TextureState<S> {
@@ -87,23 +89,26 @@ mod tests {
                 depth_or_array_layers: 1,
             };
 
-            let (texture, inner) = {
-                let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+            let texture_format = wgpu::TextureFormat::Rgba8UnormSrgb;
 
-                let texture = device.create_texture(&wgpu::TextureDescriptor {
-                    label: None,
-                    size: texture_extent,
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format,
-                    usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    view_formats: &[],
-                });
-                let inner = InnerState::new(&device, fragment_code, format)?;
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: None,
+                size: texture_extent,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: texture_format,
+                usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
 
-                (texture, inner)
-            };
+            let shady = Shady::new(&ShadyDescriptor {
+                device: &device,
+                fragment_shader: fragment_code,
+                texture_format,
+                bind_group_index: SHADY_BIND_GROUP_INDEX,
+                vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
+            })?;
 
             Ok(Self {
                 size: texture_size,
@@ -111,7 +116,7 @@ mod tests {
                 texture,
                 device,
                 queue,
-                inner,
+                shady,
                 output_buffer,
             })
         }
@@ -119,7 +124,7 @@ mod tests {
 
     impl<S: ShaderLanguage> RenderState<S> for TextureState<S> {
         fn prepare_next_frame(&mut self) {
-            self.inner.prepare_next_frame(&mut self.queue);
+            self.shady.prepare_next_frame(&mut self.queue);
         }
 
         fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -133,7 +138,7 @@ mod tests {
                     label: Some("Shady texture command encoder"),
                 });
 
-            self.inner.apply_renderpass(&mut encoder, &texture_view);
+            self.shady.add_render_pass(&mut encoder, &texture_view);
 
             encoder.copy_texture_to_buffer(
                 wgpu::ImageCopyTexture {
@@ -159,11 +164,8 @@ mod tests {
         }
 
         fn update_pipeline(&mut self, fragment_code: &str) -> Result<(), shady::Error> {
-            self.inner.update_pipeline(&self.device, fragment_code)
-        }
-
-        fn shady_mut(&mut self) -> &mut shady::Shady<S> {
-            &mut self.inner.shady
+            self.shady
+                .update_render_pipeline(&self.device, fragment_code)
         }
     }
 

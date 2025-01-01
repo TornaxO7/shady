@@ -145,14 +145,14 @@ impl<'a, F: ShaderLanguage> ApplicationHandler<UserEvent> for Renderer<'a, F> {
             WindowEvent::MouseInput {
                 state: mouse_state, ..
             } => {
-                let shady = state.shady_mut();
+                let shady = &mut state.shady;
                 match mouse_state {
                     ElementState::Pressed => shady.update_mouse_input(MouseState::Pressed),
                     ElementState::Released => shady.update_mouse_input(MouseState::Released),
                 }
             }
             WindowEvent::CursorMoved { position: pos, .. } => {
-                state.shady_mut().update_cursor(pos.x as f32, pos.y as f32)
+                state.shady.update_cursor(pos.x as f32, pos.y as f32)
             }
             WindowEvent::KeyboardInput { event, .. }
                 if event.logical_key.to_text() == Some("q") =>
