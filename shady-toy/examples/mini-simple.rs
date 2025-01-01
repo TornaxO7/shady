@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use pollster::FutureExt;
-use shady::{Shady, Wgsl};
+use shady::{Shady, ShadyDescriptor, Wgsl};
 use wgpu::{
     Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, TextureViewDescriptor,
 };
@@ -14,6 +14,8 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
+const SHADY_BIND_GROUP_INDEX: u32 = 0;
+const SHADY_VERTEX_BUFFER_INDEX: u32 = 0;
 const FRAGMENT_SHADER: &str = include_str!("../src/template.wgsl");
 
 struct State<'a> {
@@ -24,9 +26,6 @@ struct State<'a> {
     window: Arc<Window>,
     // SHADY
     shady: Shady<Wgsl>,
-
-    vbuffer: wgpu::Buffer,
-    ibuffer: wgpu::Buffer,
 }
 
 impl<'a> State<'a> {
@@ -53,12 +52,7 @@ impl<'a> State<'a> {
             .block_on()
             .unwrap();
 
-        // SHADY
-        let shady = Shady::new(&device);
-        let vbuffer = shady::vertex_buffer(&device);
-        let ibuffer = shady::index_buffer(&device);
-
-        let config = {
+        let (config, shady) = {
             let surface_caps = surface.get_capabilities(&adapter);
             let surface_format = surface_caps
                 .formats
@@ -69,7 +63,7 @@ impl<'a> State<'a> {
 
             let size = window.clone().inner_size();
 
-            wgpu::SurfaceConfiguration {
+            let config = wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: surface_format,
                 width: size.width,
@@ -78,7 +72,19 @@ impl<'a> State<'a> {
                 alpha_mode: surface_caps.alpha_modes[0],
                 view_formats: vec![],
                 desired_maximum_frame_latency: 2,
-            }
+            };
+
+            // SHADY
+            let shady = Shady::new(&ShadyDescriptor {
+                device: &device,
+                fragment_shader: FRAGMENT_SHADER,
+                texture_format: surface_format,
+                bind_group_index: SHADY_BIND_GROUP_INDEX,
+                vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
+            })
+            .unwrap();
+
+            (config, shady)
         };
 
         Self {
@@ -88,8 +94,6 @@ impl<'a> State<'a> {
             config,
             window,
             shady,
-            vbuffer,
-            ibuffer,
         }
     }
 
@@ -101,12 +105,6 @@ impl<'a> State<'a> {
     }
 
     pub fn render(&mut self) {
-        // SHADY
-        let pipeline = self
-            .shady
-            .update_render_pipeline(&self.device, FRAGMENT_SHADER, &self.config.format)
-            .unwrap();
-
         let output = self.surface.get_current_texture().unwrap();
         let view = output
             .texture
@@ -118,28 +116,7 @@ impl<'a> State<'a> {
                 label: Some("Render encoder"),
             });
 
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                ..Default::default()
-            });
-
-            render_pass.set_pipeline(&pipeline);
-
-            // SHADY
-            render_pass.set_bind_group(0, &self.shady.bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vbuffer.slice(..));
-            render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(shady::index_buffer_range(), 0, 0..1);
-        }
+        self.shady.add_render_pass(&mut encoder, &view);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
