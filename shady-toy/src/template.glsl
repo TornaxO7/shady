@@ -6,10 +6,10 @@ layout(binding = 0) uniform float iTime;
 // y: height
 layout(binding = 1) uniform vec2 iResolution;
 
-// x: bass
-// y: mid
-// z: treble
-layout(binding = 2) uniform vec3 iAudio;
+// 
+layout(binding = 2) buffer iAudio {
+    float freqs[10];
+};
 
 // x: x-coord when the mouse is pressed
 // y: y-coord when the mouse is pressed

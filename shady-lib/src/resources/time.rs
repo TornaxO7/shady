@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use wgpu::Device;
 
-use super::Uniform;
+use super::Resource;
 
 #[derive(Debug)]
 pub struct Time {
@@ -12,11 +12,11 @@ pub struct Time {
     binding: u32,
 }
 
-impl Uniform for Time {
+impl Resource for Time {
     type BufferDataType = f32;
 
     fn new(device: &Device, binding: u32) -> Self {
-        let buffer = Self::create_buffer(device);
+        let buffer = Self::create_uniform_buffer(device);
 
         Self {
             time: Instant::now(),
@@ -29,6 +29,10 @@ impl Uniform for Time {
         "Shady iTime buffer"
     }
 
+    fn buffer_type() -> wgpu::BufferBindingType {
+        wgpu::BufferBindingType::Uniform
+    }
+
     fn binding(&self) -> u32 {
         self.binding
     }
@@ -38,8 +42,6 @@ impl Uniform for Time {
 
         queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&[elapsed_time]));
     }
-
-    fn cleanup(&mut self) {}
 
     fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer

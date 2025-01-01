@@ -16,7 +16,7 @@ use wgpu::Device;
 
 pub use mouse::MouseState;
 
-pub trait Uniform {
+pub trait Resource {
     type BufferDataType;
 
     fn new(device: &Device, binding: u32) -> Self;
@@ -27,11 +27,11 @@ pub trait Uniform {
 
     fn update_buffer(&self, queue: &mut wgpu::Queue);
 
-    fn cleanup(&mut self);
-
     fn buffer(&self) -> &wgpu::Buffer;
 
-    fn create_buffer(device: &Device) -> wgpu::Buffer {
+    fn buffer_type() -> wgpu::BufferBindingType;
+
+    fn create_uniform_buffer(device: &Device) -> wgpu::Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(Self::buffer_label()),
             size: std::mem::size_of::<Self::BufferDataType>() as u64,
@@ -39,9 +39,18 @@ pub trait Uniform {
             mapped_at_creation: false,
         })
     }
+
+    fn create_storage_buffer(device: &Device) -> wgpu::Buffer {
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(&Self::buffer_label()),
+            size: std::mem::size_of::<Self::BufferDataType>() as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
+    }
 }
 
-pub struct Uniforms {
+pub struct Resources {
     pub time: Time,
     pub resolution: Resolution,
     #[cfg(feature = "audio")]
@@ -50,7 +59,7 @@ pub struct Uniforms {
     pub mouse: Mouse,
 }
 
-impl Uniforms {
+impl Resources {
     #[instrument(level = "trace")]
     pub fn new(device: &wgpu::Device) -> Self {
         const INIT_BINDING: u32 = 0;
@@ -75,31 +84,24 @@ impl Uniforms {
         self.frame.update_buffer(queue);
         self.mouse.update_buffer(queue);
     }
-
-    #[instrument(skip_all, level = "trace")]
-    pub fn cleanup(&mut self) {
-        self.time.cleanup();
-        self.resolution.cleanup();
-        #[cfg(feature = "audio")]
-        self.audio.cleanup();
-        self.frame.cleanup();
-        self.mouse.cleanup();
-    }
 }
 
 /// Methods regardin bind groups
-impl Uniforms {
+impl Resources {
     #[instrument(skip(self), level = "trace")]
     pub fn bind_group_layout(&self, device: &Device) -> wgpu::BindGroupLayout {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shady bind group layout"),
             entries: &[
-                bind_group_layout_entry(self.time.binding()),
-                bind_group_layout_entry(self.resolution.binding()),
+                bind_group_layout_uniform_entry(self.time.binding(), Time::buffer_type()),
+                bind_group_layout_uniform_entry(
+                    self.resolution.binding(),
+                    Resolution::buffer_type(),
+                ),
                 #[cfg(feature = "audio")]
-                bind_group_layout_entry(self.audio.binding()),
-                bind_group_layout_entry(self.frame.binding()),
-                bind_group_layout_entry(self.mouse.binding()),
+                bind_group_layout_uniform_entry(self.audio.binding(), Audio::buffer_type()),
+                bind_group_layout_uniform_entry(self.frame.binding(), Frame::buffer_type()),
+                bind_group_layout_uniform_entry(self.mouse.binding(), Mouse::buffer_type()),
             ],
         })
     }
@@ -139,12 +141,15 @@ impl Uniforms {
 }
 
 #[instrument(level = "trace")]
-fn bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+fn bind_group_layout_uniform_entry(
+    binding: u32,
+    ty: wgpu::BufferBindingType,
+) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
         visibility: wgpu::ShaderStages::FRAGMENT,
         ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
+            ty,
             has_dynamic_offset: false,
             min_binding_size: None,
         },

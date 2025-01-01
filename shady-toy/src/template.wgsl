@@ -6,11 +6,8 @@ var<uniform> iTime: f32;
 @group(0) @binding(1)
 var<uniform> iResolution: vec2<f32>;
 
-// x: bass
-// y: mid
-// z: treble
 @group(0) @binding(2)
-var<uniform> iAudio: vec3<f32>;
+var<storage, read> iAudio: array<f32, 10>;
 
 // x: x-coord when the mouse is pressed
 // y: y-coord when the mouse is pressed

@@ -1,6 +1,6 @@
 use tracing::{debug, instrument};
 
-use super::Uniform;
+use super::Resource;
 
 #[derive(Default, Debug, Clone, Copy)]
 struct Coord {
@@ -48,11 +48,11 @@ impl Mouse {
     }
 }
 
-impl Uniform for Mouse {
+impl Resource for Mouse {
     type BufferDataType = [f32; 4];
 
     fn new(device: &wgpu::Device, binding: u32) -> Self {
-        let buffer = Self::create_buffer(device);
+        let buffer = Self::create_uniform_buffer(device);
 
         Self {
             pos: Coord::default(),
@@ -73,6 +73,10 @@ impl Uniform for Mouse {
         "Shady iMouse buffer"
     }
 
+    fn buffer_type() -> wgpu::BufferBindingType {
+        wgpu::BufferBindingType::Uniform
+    }
+
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
         let data = [
             self.curr_pos.x,
@@ -83,8 +87,6 @@ impl Uniform for Mouse {
 
         queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&data));
     }
-
-    fn cleanup(&mut self) {}
 
     fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer

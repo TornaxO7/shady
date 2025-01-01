@@ -1,10 +1,10 @@
 [package]
-name = "shady-app"
+name = "shady-toy"
 version = "0.1.0"
 edition = "2021"
 authors = ["TornaxO7 <tornax@pm.me>"]
-description = "A desktop app for shady to create your own shaders with wgsl."
-license = "GPL2"
+description = "A desktop app for shady to create your own shaders with wgsl and/or glsl."
+license = "GPL-3.0-or-later"
 
 [dependencies]
 anyhow = "1"

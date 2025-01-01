@@ -152,10 +152,6 @@ impl<'a, F: Frontend> State<'a, F> {
         Ok(())
     }
 
-    pub fn cleanup(&mut self) {
-        self.shady.cleanup();
-    }
-
     pub fn window(&self) -> Arc<Window> {
         self.window.clone()
     }
@@ -308,10 +304,6 @@ impl<'a, F: Frontend> ApplicationHandler<UserEvent> for Renderer<'a, F> {
             WindowEvent::KeyboardInput { event, .. }
                 if event.logical_key.to_text() == Some("q") =>
             {
-                if let Some(state) = &mut self.state {
-                    state.cleanup();
-                }
-
                 event_loop.exit();
             }
             _ => (),

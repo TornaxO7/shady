@@ -1,4 +1,4 @@
-use super::Uniform;
+use super::Resource;
 
 pub struct Frame {
     value: u32,
@@ -17,11 +17,11 @@ impl Frame {
     }
 }
 
-impl Uniform for Frame {
+impl Resource for Frame {
     type BufferDataType = u32;
 
     fn new(device: &wgpu::Device, binding: u32) -> Self {
-        let buffer = Self::create_buffer(device);
+        let buffer = Self::create_uniform_buffer(device);
 
         Self {
             value: 0,
@@ -38,11 +38,13 @@ impl Uniform for Frame {
         "Shady iFrame buffer"
     }
 
+    fn buffer_type() -> wgpu::BufferBindingType {
+        wgpu::BufferBindingType::Uniform
+    }
+
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
         queue.write_buffer(self.buffer(), 0, &self.value.to_ne_bytes());
     }
-
-    fn cleanup(&mut self) {}
 
     fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer

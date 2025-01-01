@@ -2292,30 +2292,10 @@ name = "shady"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "cpal",
- "realfft",
  "shady-audio",
  "thiserror 2.0.8",
  "tracing",
  "wgpu",
-]
-
-[[package]]
-name = "shady-app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ariadne",
- "clap",
- "criterion",
- "notify",
- "pollster",
- "shady",
- "thiserror 2.0.8",
- "tracing",
- "tracing-subscriber",
- "wgpu",
- "winit",
 ]
 
 [[package]]
@@ -2342,6 +2322,24 @@ dependencies = [
  "splines",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "shady-toy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ariadne",
+ "clap",
+ "criterion",
+ "notify",
+ "pollster",
+ "shady",
+ "thiserror 2.0.8",
+ "tracing",
+ "tracing-subscriber",
+ "wgpu",
+ "winit",
 ]
 
 [[package]]

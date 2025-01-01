@@ -1,5 +1,5 @@
 [workspace]
-members = ["shady-lib", "shady-app", "shady-audio", "shady-cli"]
+members = ["shady-lib", "shady-toy", "shady-audio", "shady-cli"]
 resolver = "2"
 
 [workspace.dependencies]
