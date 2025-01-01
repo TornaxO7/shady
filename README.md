@@ -1,31 +1,24 @@
 # Shady
 
 Shady is a rust-libraray to integrate [shadertoy](-like) easier into your app. It also ships with a default application
-which uses the library: [shady-app] which is basically like a local [shadertoy]-desktop-app.
+which uses the library: [shady-toy] which is basically like a local [shadertoy]-desktop-app.
 
 It supports fragment shaders written in [wgsl] **_and_** [glsl]. The app determines which shader-language is used by
 looking at the file-extension like `fragment.wgsl` or `fragment.glsl`.
 
+There's also a [cava] like app: [shady-cli] which also displays bars on the terminal as [cava] but it's not as feature complete as [cava].
+
 # Usage
 
-In general `shady-app <path> --template` will likely be what you want to execute. For example:
+In general `shady-toy <path> --template` will likely be what you want to execute. For example:
 
 ```bash
 # if you want to write the fragment shader in `wgsl`
-shady-app /tmp/fragment.wgsl --template
+shady-toy /tmp/fragment.wgsl --template
 
 # if you want to write the fragment shade rin `glsl`
-shady-app /tmp/fragment.glsl --template
+shady-toy /tmp/fragment.glsl --template
 ```
-
-Currently the `audio` uniform buffer is hidden behind a feature flag which is _disabled_ per default since it's pretty unstable (but it works).
-You'll have to build it your own with:
-
-```bash
-cargo run --release --features audio -- /tmp/fragment.wgsl --template
-```
-
-if you want to use the `iAudio` buffer.
 
 ## `nix`
 
@@ -42,14 +35,15 @@ cargo run --release -- <path> --template
 # Features
 
 - Live reloading (after save)
-- Audio uniform buffer
+- Audio buffer
 
 Currently implemented uniform buffers:
 
 - `iTime`
 - `iResolution`
 - `iFrame`
-- (`iAudio`)
+- `iAudio` (with 10 elements, for the time being)
+- `iMouse` (although not really tested)
 
 # Demo
 
@@ -58,15 +52,15 @@ A demo can be seen [here](https://filebrowser.tornaxo7.de/api/public/dl/LB5bVE74
 # Examples
 
 - The template itself is an example if you run `shady <path> --template`, you can start writing your shader
-- See in `shader-examples/` (run `shady-app shader-examples/<file>`)
+- See in `shader-examples/` (run `shady-toy shader-examples/<file>`)
 
 # Shadertoy
 
-Currently, you can't just copy+paste the shaders from [shadertoy] due to some differences how [shady-app] and [shadertoy] are using the fragment shaders.
-So for the time being, here's a little (hopefully full) checklist/guide about how to get a shader from [shadertoy] up and running by using `shady-app`
+Currently, you can't just copy+paste the shaders from [shadertoy] due to some differences how [shady-toy] and [shadertoy] are using the fragment shaders.
+So for the time being, here's a little (hopefully full) checklist/guide about how to get a shader from [shadertoy] up and running by using `shady-toy`
 
 1. Make sure that the shader from [shadertoy] uses the uniform buffers listed in `# Features` _at most_.
-2. Start by creating a `glsl` template by adding the `--template` argument (for example: `shady-app /tmp/fragment.glsl --template`).
+2. Start by creating a `glsl` template by adding the `--template` argument (for example: `shady-toy /tmp/fragment.glsl --template`).
 3. Open the fragment shader.
 4. _Don't_ remove the `uniform` lines from the template!
 5. Copy+Paste the [shadertoy]-fragment by replacing the `main` function.
@@ -92,9 +86,11 @@ You are able to write shaders similar to [shadertoy] and you have the uniform va
 However it's mostly unstable and unpolished (for example [gamma correction] is missing), that's why I'm not creating a release (yet?) for the lib but also for the app.
 
 [shadertoy]: https://www.shadertoy.com/
-[shady-app]: https://github.com/TornaxO7/shady/tree/main/shady-app
+[shady-toy]: https://github.com/TornaxO7/shady/tree/main/shady-toy
 [wgsl]: https://www.w3.org/TR/WGSL/
 [pavucontrol]: https://github.com/pulseaudio/pavucontrol
 [gamma correction]: https://en.wikipedia.org/wiki/Gamma_correction
 [rust]: https://www.rust-lang.org/
 [glsl]: https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)
+[cava]: https://github.com/karlstav/cava
+[shady-cli]: https://github.com/TornaxO7/shady/tree/main/shady-cli

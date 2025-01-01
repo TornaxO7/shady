@@ -27,5 +27,5 @@ criterion = { version = "0.5", features = ["html_reports"] }
 name = "octagrams"
 
 [features]
-default = []
+default = ["audio"]
 audio = ["shady/audio"]
