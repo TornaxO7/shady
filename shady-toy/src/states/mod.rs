@@ -1,6 +1,7 @@
 use shady::ShaderLanguage;
 
-pub mod texture_state;
+#[cfg(test)]
+mod texture_state;
 pub mod window_state;
 
 const SHADY_BIND_GROUP_INDEX: u32 = 0;

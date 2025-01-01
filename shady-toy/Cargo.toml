@@ -14,7 +14,6 @@ pollster = "0.4.0"
 notify = "7"
 shady = { path = "../shady-lib" }
 winit = "0.30"
-image = "0.25"
 
 wgpu.workspace = true
 tracing.workspace = true
@@ -23,6 +22,7 @@ clap.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+image = "0.25"
 
 [[bench]]
 name = "octagrams"
