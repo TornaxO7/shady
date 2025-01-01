@@ -2319,7 +2319,15 @@ dependencies = [
  "crossterm",
  "ratatui",
  "shady-audio",
- "splines",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "shady-renderer"
+version = "0.1.0"
+dependencies = [
+ "shady-audio",
  "tracing",
  "tracing-subscriber",
 ]

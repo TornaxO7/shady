@@ -11,7 +11,6 @@ anyhow = "1"
 ariadne = "0.5"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pollster = "0.4.0"
-winit = "0.30"
 notify = "7"
 shady = { path = "../shady-lib" }
 
@@ -19,6 +18,7 @@ wgpu.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 clap.workspace = true
+winit.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

@@ -1,5 +1,5 @@
 [package]
-name = "shady-cli"
+name = "shady-renderer"
 version = "0.1.0"
 edition = "2021"
 authors = ["TornaxO7 <tornax@pm.me>"]
@@ -7,11 +7,8 @@ description = "A music visualizer in the terminal"
 license = "GPL-3.0-or-later"
 
 [dependencies]
-crossterm = "0.28.1"
-ratatui = "0.29"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 shady-audio = { path = "../shady-audio" }
 
 tracing.workspace = true
-clap.workspace = true
