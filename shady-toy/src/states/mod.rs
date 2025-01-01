@@ -1,6 +1,7 @@
 use shady::ShaderLanguage;
 
 pub mod inner;
+pub mod texture_state;
 pub mod window_state;
 
 pub trait RenderState<S: ShaderLanguage> {
