@@ -7,7 +7,7 @@ However, it's very easy to port a shader from [shadertoy] to `shady-toy`. Below 
 
 # Demo
 
-[![](https://www.youtube.com/watch?v=twpxyUE5soE)](https://www.youtube.com/watch?v=twpxyUE5soE)
+[![Demo video](https://img.youtube.com/vi/twpxyUE5soE/maxresdefault.jpg)](https://www.youtube.com/watch?v=twpxyUE5soE)
 
 # Shader examples
 
