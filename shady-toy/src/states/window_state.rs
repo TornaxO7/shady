@@ -84,6 +84,8 @@ impl<'a, S: ShaderParser> WindowState<'a, S> {
             (config, shady)
         };
 
+        surface.configure(&device, &config);
+
         Ok(Self {
             surface,
             device,
