@@ -26,6 +26,8 @@
               xorg.libXrandr
               xorg.libXcursor
 
+              wayland
+
               alsa-lib
 
               libGL
@@ -35,7 +37,6 @@
               vulkan-validation-layers
               vulkan-tools
 
-              sonic-visualiser
               wgpu-utils
             ];
           in
@@ -48,7 +49,10 @@
               ];
             };
 
-            packages.default = pkgs.callPackage (import ./nix/package.nix) { };
+            packages = {
+              shady-cli = pkgs.callPackage (import ./nix/shady-cli-package.nix) { };
+              shady-toy = pkgs.callPackage (import ./nix/shady-toy-package.nix) { };
+            };
 
             devShells.default =
               let

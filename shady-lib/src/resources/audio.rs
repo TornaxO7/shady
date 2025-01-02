@@ -8,6 +8,9 @@ use crate::template::TemplateGenerator;
 use super::Resource;
 
 const AUDIO_BUFFER_SIZE: usize = 20;
+const DESCRIPTION: &str = "\
+// It contains the 'presence' of a frequency. The lower the index the lower is its frequency and the other way round.
+// So for example, if you are interested in the bass, choose the lower indices.";
 
 pub struct Audio {
     shady_audio: ShadyAudio,
@@ -77,9 +80,11 @@ impl TemplateGenerator for Audio {
     ) -> Result<(), fmt::Error> {
         writer.write_fmt(format_args!(
             "
+{}
 @group({}) @binding({})
 var<storage, read> iAudio: array<f32, {}>;
 ",
+            DESCRIPTION,
             bind_group_index,
             Self::binding(),
             AUDIO_BUFFER_SIZE
@@ -89,10 +94,12 @@ var<storage, read> iAudio: array<f32, {}>;
     fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
         writer.write_fmt(format_args!(
             "
+{}
 layout(binding = {}) buffer iAudio {{
     float freqs[{}];
 }};
 ",
+            DESCRIPTION,
             Self::binding(),
             AUDIO_BUFFER_SIZE
         ))

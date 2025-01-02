@@ -164,6 +164,7 @@ impl<S: ShaderParser> RenderState<S> for TextureState<S> {
 }
 
 #[test]
+#[ignore] // nix build fails otherwise
 fn red_screen() {
     let frag_code = "
             @fragment

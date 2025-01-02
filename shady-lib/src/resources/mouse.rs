@@ -8,8 +8,7 @@ use super::Resource;
 
 const DESC: &str = "\
 // xy (index 0 and 1): The xy coordinate of the mouse while the user holds the left button
-// zw (index 2 and 3): The xy coordinate of the mouse where the user starts holding the left button
-";
+// zw (index 2 and 3): The xy coordinate of the mouse where the user starts holding the left button";
 
 #[derive(Default, Debug, Clone, Copy)]
 struct Coord {

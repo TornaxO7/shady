@@ -1,4 +1,4 @@
-#version 450
+// Source: https://www.shadertoy.com/view/tlVGDt
 
 layout(binding = 0) buffer iAudio {
     float freqs[20];
@@ -6,10 +6,8 @@ layout(binding = 0) buffer iAudio {
 
 layout(binding = 1) uniform uint iFrame;
 
-// x: x-coord when the mouse is pressed
-// y: y-coord when the mouse is pressed
-// z: x-coord when the mouse is released
-// w: y-coord when the mouse is released
+// xy (index 0 and 1): The xy coordinate of the mouse while the user holds the left button
+// zw (index 2 and 3): The xy coordinate of the mouse where the user starts holding the left button
 layout(binding = 2) uniform vec4 iMouse;
 
 // x: width
@@ -18,6 +16,7 @@ layout(binding = 3) uniform vec2 iResolution;
 
 layout(binding = 4) uniform float iTime;
 
+// the color which the pixel should have
 layout(location = 0) out vec4 fragColor;
 
 precision highp float;

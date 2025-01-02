@@ -21,11 +21,7 @@ thiserror.workspace = true
 clap.workspace = true
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
 image = "0.25"
-
-[[bench]]
-name = "octagrams"
 
 [features]
 default = ["audio"]
