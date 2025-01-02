@@ -11,7 +11,7 @@ However, it's very easy to port a shader from [shadertoy] to `shady-toy`. Below 
 
 # Shader examples
 
-You can find some shaders in the [shader-examples] directory if you want to try some shaders out.
+You can find some shaders in the [shader-examples/] directory if you want to try some shaders out.
 Just provide the path to the file if you start `shady-toy` (but **_without_** the argument `--template`, otherwise you'll overwrite those files).
 
 Obviously, credits are going to the original authors of those shaders. Source of those shaders are added at the top of the files.
