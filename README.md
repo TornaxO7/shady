@@ -39,3 +39,4 @@ Here are some other sources/similar projects if you're interested:
 [glsl]: https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)
 [wgsl]: https://www.w3.org/TR/WGSL/
 [musializer]: https://github.com/tsoding/musializer
+[cava]: https://github.com/karlstav/cava
