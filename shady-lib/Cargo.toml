@@ -16,6 +16,10 @@ tracing.workspace = true
 thiserror.workspace = true
 
 [features]
-default = ["audio"]
+default = ["time", "resolution", "audio", "mouse", "frame"]
 
+time = []
+resolution = []
 audio = []
+mouse = []
+frame = []

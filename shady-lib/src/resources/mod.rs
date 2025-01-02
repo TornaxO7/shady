@@ -1,32 +1,47 @@
 #[cfg(feature = "audio")]
 mod audio;
+#[cfg(feature = "frame")]
 mod frame;
+#[cfg(feature = "mouse")]
 mod mouse;
+#[cfg(feature = "resolution")]
 mod resolution;
+#[cfg(feature = "time")]
 mod time;
 
 use std::fmt;
 
 #[cfg(feature = "audio")]
 use audio::Audio;
+#[cfg(feature = "frame")]
 use frame::Frame;
+#[cfg(feature = "mouse")]
 use mouse::Mouse;
+#[cfg(feature = "resolution")]
 use resolution::Resolution;
+#[cfg(feature = "time")]
 use time::Time;
+
 use tracing::instrument;
 use wgpu::Device;
 
+#[cfg(feature = "mouse")]
 pub use mouse::MouseState;
 
 use crate::template::TemplateGenerator;
 
 #[repr(u32)]
 enum BindingValue {
-    Time,
-    Resolution,
+    #[cfg(feature = "audio")]
     Audio,
-    Mouse,
+    #[cfg(feature = "frame")]
     Frame,
+    #[cfg(feature = "mouse")]
+    Mouse,
+    #[cfg(feature = "resolution")]
+    Resolution,
+    #[cfg(feature = "time")]
+    Time,
 }
 
 pub trait Resource: TemplateGenerator {
@@ -64,36 +79,47 @@ pub trait Resource: TemplateGenerator {
 }
 
 pub struct Resources {
-    pub time: Time,
-    pub resolution: Resolution,
     #[cfg(feature = "audio")]
     pub audio: Audio,
+    #[cfg(feature = "frame")]
     pub frame: Frame,
+    #[cfg(feature = "mouse")]
     pub mouse: Mouse,
+    #[cfg(feature = "resolution")]
+    pub resolution: Resolution,
+    #[cfg(feature = "time")]
+    pub time: Time,
 }
 
 impl Resources {
     #[instrument(level = "trace")]
     pub fn new(device: &wgpu::Device) -> Self {
         Self {
-            time: Time::new(device),
-            resolution: Resolution::new(device),
             #[cfg(feature = "audio")]
             audio: Audio::new(device),
-            mouse: Mouse::new(device),
+            #[cfg(feature = "frame")]
             frame: Frame::new(device),
+            #[cfg(feature = "mouse")]
+            mouse: Mouse::new(device),
+            #[cfg(feature = "resolution")]
+            resolution: Resolution::new(device),
+            #[cfg(feature = "time")]
+            time: Time::new(device),
         }
     }
 
     #[instrument(skip_all, level = "trace")]
     pub fn update_buffers(&mut self, queue: &mut wgpu::Queue) {
-        self.time.update_buffer(queue);
-        self.resolution.update_buffer(queue);
-
         #[cfg(feature = "audio")]
         self.audio.update_buffer(queue);
+        #[cfg(feature = "frame")]
         self.frame.update_buffer(queue);
+        #[cfg(feature = "mouse")]
         self.mouse.update_buffer(queue);
+        #[cfg(feature = "resolution")]
+        self.resolution.update_buffer(queue);
+        #[cfg(feature = "time")]
+        self.time.update_buffer(queue);
     }
 }
 
@@ -104,12 +130,16 @@ impl Resources {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shady bind group layout"),
             entries: &[
-                bind_group_layout_entry(Time::binding(), Time::buffer_type()),
-                bind_group_layout_entry(Resolution::binding(), Resolution::buffer_type()),
                 #[cfg(feature = "audio")]
                 bind_group_layout_entry(Audio::binding(), Audio::buffer_type()),
+                #[cfg(feature = "frame")]
                 bind_group_layout_entry(Frame::binding(), Frame::buffer_type()),
+                #[cfg(feature = "mouse")]
                 bind_group_layout_entry(Mouse::binding(), Mouse::buffer_type()),
+                #[cfg(feature = "resolution")]
+                bind_group_layout_entry(Resolution::binding(), Resolution::buffer_type()),
+                #[cfg(feature = "time")]
+                bind_group_layout_entry(Time::binding(), Time::buffer_type()),
             ],
         })
     }
@@ -122,26 +152,30 @@ impl Resources {
             label: Some("Shady bind group"),
             layout: &layout,
             entries: &[
-                wgpu::BindGroupEntry {
-                    binding: Time::binding(),
-                    resource: self.time.buffer().as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: Resolution::binding(),
-                    resource: self.resolution.buffer().as_entire_binding(),
-                },
                 #[cfg(feature = "audio")]
                 wgpu::BindGroupEntry {
                     binding: Audio::binding(),
                     resource: self.audio.buffer().as_entire_binding(),
                 },
+                #[cfg(feature = "frame")]
                 wgpu::BindGroupEntry {
                     binding: Frame::binding(),
                     resource: self.frame.buffer().as_entire_binding(),
                 },
+                #[cfg(feature = "mouse")]
                 wgpu::BindGroupEntry {
                     binding: Mouse::binding(),
                     resource: self.mouse.buffer().as_entire_binding(),
+                },
+                #[cfg(feature = "resolution")]
+                wgpu::BindGroupEntry {
+                    binding: Resolution::binding(),
+                    resource: self.resolution.buffer().as_entire_binding(),
+                },
+                #[cfg(feature = "time")]
+                wgpu::BindGroupEntry {
+                    binding: Time::binding(),
+                    resource: self.time.buffer().as_entire_binding(),
                 },
             ],
         })
@@ -153,21 +187,31 @@ impl TemplateGenerator for Resources {
         writer: &mut dyn fmt::Write,
         bind_group_index: u32,
     ) -> Result<(), fmt::Error> {
-        Time::write_wgsl_template(writer, bind_group_index)?;
-        Resolution::write_wgsl_template(writer, bind_group_index)?;
+        #[cfg(feature = "audio")]
         Audio::write_wgsl_template(writer, bind_group_index)?;
-        Mouse::write_wgsl_template(writer, bind_group_index)?;
+        #[cfg(feature = "frame")]
         Frame::write_wgsl_template(writer, bind_group_index)?;
+        #[cfg(feature = "mouse")]
+        Mouse::write_wgsl_template(writer, bind_group_index)?;
+        #[cfg(feature = "resolution")]
+        Resolution::write_wgsl_template(writer, bind_group_index)?;
+        #[cfg(feature = "time")]
+        Time::write_wgsl_template(writer, bind_group_index)?;
 
         Ok(())
     }
 
     fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
-        Time::write_glsl_template(writer)?;
-        Resolution::write_glsl_template(writer)?;
+        #[cfg(feature = "audio")]
         Audio::write_glsl_template(writer)?;
-        Mouse::write_glsl_template(writer)?;
+        #[cfg(feature = "frame")]
         Frame::write_glsl_template(writer)?;
+        #[cfg(feature = "mouse")]
+        Mouse::write_glsl_template(writer)?;
+        #[cfg(feature = "resolution")]
+        Resolution::write_glsl_template(writer)?;
+        #[cfg(feature = "time")]
+        Time::write_glsl_template(writer)?;
 
         Ok(())
     }

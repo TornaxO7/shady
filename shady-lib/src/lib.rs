@@ -11,6 +11,8 @@ use tracing::instrument;
 use wgpu::{CommandEncoder, Device, TextureView};
 
 pub use descriptor::ShadyDescriptor;
+
+#[cfg(feature = "mouse")]
 pub use resources::MouseState;
 pub use shader_language::{Glsl, ShaderParser, Wgsl};
 pub use template::TemplateLang;
@@ -118,6 +120,7 @@ impl<P: ShaderParser> Shady<P> {
         device: &Device,
         fragment_shader: S,
     ) -> Result<(), Error> {
+        #[cfg(feature = "frame")]
         self.resources.frame.reset_counter();
         let bind_group_layout = Resources::bind_group_layout(device);
 
@@ -135,20 +138,24 @@ impl<P: ShaderParser> Shady<P> {
 
 /// Updating functions
 impl<P: ShaderParser> Shady<P> {
+    #[cfg(feature = "resolution")]
     pub fn update_resolution(&mut self, width: u32, height: u32) {
         debug_assert!(width > 0);
         debug_assert!(height > 0);
         self.resources.resolution.update_resolution(width, height);
     }
 
+    #[cfg(feature = "mouse")]
     pub fn update_mouse_input(&mut self, state: MouseState) {
         self.resources.mouse.mouse_input(state);
     }
 
+    #[cfg(feature = "mouse")]
     pub fn update_cursor(&mut self, x: f32, y: f32) {
         self.resources.mouse.cursor_moved(x, y);
     }
 
+    #[cfg(feature = "frame")]
     pub fn prepare_next_frame(&mut self, queue: &mut wgpu::Queue) {
         self.resources.frame.next_frame();
         self.resources.update_buffers(queue);
