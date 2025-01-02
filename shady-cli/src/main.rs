@@ -2,7 +2,7 @@ use clap::Parser;
 use std::{fs::File, time::Duration};
 
 use crossterm::{
-    event::{self, Event},
+    event::{self, Event, KeyCode, KeyEvent},
     terminal::WindowSize,
 };
 use ratatui::{
@@ -17,7 +17,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 #[command(version, about)]
 struct Ctx {
     /// The bar width
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short, long, default_value_t = 3)]
     bar_width: u16,
 
     /// The bar color. For a full list of possible colors: https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html
@@ -28,7 +28,7 @@ struct Ctx {
 fn main() -> std::io::Result<()> {
     init_logger();
 
-    let ctx = Ctx::parse();
+    let mut ctx = Ctx::parse();
 
     let mut terminal = ratatui::init();
     let mut audio = ShadyAudio::new(
@@ -44,8 +44,17 @@ fn main() -> std::io::Result<()> {
             .expect("Render frame");
 
         if event::poll(Duration::from_millis(1000 / 60))? {
-            if matches!(event::read()?, Event::Key(_)) {
-                break;
+            match event::read()? {
+                Event::Key(KeyEvent { code, .. }) => match code {
+                    KeyCode::Char('q') => break,
+                    KeyCode::Char('+') => ctx.bar_width += 1,
+                    KeyCode::Char('-') => {
+                        ctx.bar_width = std::cmp::min(std::cmp::max(ctx.bar_width - 1, 1), 300);
+                        tracing::debug!("width: {}", ctx.bar_width);
+                    }
+                    _ => {}
+                },
+                _ => {}
             }
         }
     }
