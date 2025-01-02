@@ -2590,10 +2590,12 @@ name = "shady"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "pollster",
  "shady-audio",
  "thiserror 2.0.8",
  "tracing",
  "wgpu",
+ "winit",
 ]
 
 [[package]]

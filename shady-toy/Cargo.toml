@@ -10,15 +10,15 @@ license = "GPL-3.0-or-later"
 anyhow = "1"
 ariadne = "0.5"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-pollster = "0.4.0"
 notify = "7"
 shady = { path = "../shady-lib" }
-winit = "0.30"
 
+winit.workspace = true
 wgpu.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 clap.workspace = true
+pollster.workspace = true
 
 [dev-dependencies]
 image = "0.25"
