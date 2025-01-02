@@ -1,7 +1,7 @@
 use tracing::instrument;
 use wgpu::naga::{front::glsl::Options, ShaderStage};
 
-use super::ShaderLanguage;
+use super::ShaderParser;
 
 pub struct Glsl(wgpu::naga::front::glsl::Frontend);
 
@@ -12,7 +12,7 @@ impl Glsl {
     }
 }
 
-impl ShaderLanguage for Glsl {
+impl ShaderParser for Glsl {
     #[instrument(level = "trace")]
     fn new() -> Self {
         Self::new()

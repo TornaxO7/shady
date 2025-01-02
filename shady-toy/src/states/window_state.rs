@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use pollster::FutureExt;
-use shady::{ShaderLanguage, Shady, ShadyDescriptor};
+use shady::{ShaderParser, Shady, ShadyDescriptor};
 use tracing::trace;
 use wgpu::{
     Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, TextureViewDescriptor,
@@ -12,7 +12,7 @@ use super::{SHADY_BIND_GROUP_INDEX, SHADY_VERTEX_BUFFER_INDEX};
 
 use super::RenderState;
 
-pub struct WindowState<'a, S: ShaderLanguage> {
+pub struct WindowState<'a, S: ShaderParser> {
     surface: Surface<'a>,
     device: Device,
     queue: Queue,
@@ -21,7 +21,7 @@ pub struct WindowState<'a, S: ShaderLanguage> {
     pub shady: Shady<S>,
 }
 
-impl<'a, S: ShaderLanguage> WindowState<'a, S> {
+impl<'a, S: ShaderParser> WindowState<'a, S> {
     pub fn new(window: Window, fragment_code: &str) -> Result<Self, shady::Error> {
         trace!(
             "Create new WindowState with fragment code:\n{}",
@@ -109,7 +109,7 @@ impl<'a, S: ShaderLanguage> WindowState<'a, S> {
     }
 }
 
-impl<'a, S: ShaderLanguage> RenderState<S> for WindowState<'a, S> {
+impl<'a, S: ShaderParser> RenderState<S> for WindowState<'a, S> {
     fn prepare_next_frame(&mut self) {
         self.shady.prepare_next_frame(&mut self.queue);
     }

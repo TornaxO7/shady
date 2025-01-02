@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, path::PathBuf};
 
 use ariadne::{Color, Fmt, Label, Report, Source};
-use shady::{MouseState, ShaderLanguage};
+use shady::{MouseState, ShaderParser};
 use tracing::{debug, warn};
 use wgpu::SurfaceError;
 use winit::{
@@ -25,7 +25,7 @@ enum RenderError {
     IO(#[from] std::io::Error),
 }
 
-pub struct Renderer<'a, S: ShaderLanguage> {
+pub struct Renderer<'a, S: ShaderParser> {
     state: Option<WindowState<'a, S>>,
     display_error: bool,
 
@@ -33,7 +33,7 @@ pub struct Renderer<'a, S: ShaderLanguage> {
     fragment_code: String,
 }
 
-impl<'a, F: ShaderLanguage> Renderer<'a, F> {
+impl<'a, F: ShaderParser> Renderer<'a, F> {
     pub fn new(fragment_path: PathBuf) -> anyhow::Result<Self> {
         let mut renderer = Self {
             state: None,
@@ -98,7 +98,7 @@ impl<'a, F: ShaderLanguage> Renderer<'a, F> {
     }
 }
 
-impl<'a, F: ShaderLanguage> ApplicationHandler<UserEvent> for Renderer<'a, F> {
+impl<'a, F: ShaderParser> ApplicationHandler<UserEvent> for Renderer<'a, F> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = event_loop
             .create_window(WindowAttributes::default())

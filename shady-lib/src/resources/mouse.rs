@@ -1,4 +1,8 @@
+use std::fmt;
+
 use tracing::{debug, instrument};
+
+use crate::template::TemplateGenerator;
 
 use super::Resource;
 
@@ -22,7 +26,6 @@ pub struct Mouse {
     curr_pos: Coord,
 
     buffer: wgpu::Buffer,
-    binding: u32,
 }
 
 impl Mouse {
@@ -51,7 +54,7 @@ impl Mouse {
 impl Resource for Mouse {
     type BufferDataType = [f32; 4];
 
-    fn new(device: &wgpu::Device, binding: u32) -> Self {
+    fn new(device: &wgpu::Device) -> Self {
         let buffer = Self::create_uniform_buffer(device);
 
         Self {
@@ -60,13 +63,12 @@ impl Resource for Mouse {
             prev_pos: Coord::default(),
             curr_pos: Coord::default(),
 
-            binding,
             buffer,
         }
     }
 
-    fn binding(&self) -> u32 {
-        self.binding
+    fn binding() -> u32 {
+        super::BindingValue::Mouse as u32
     }
 
     fn buffer_label() -> &'static str {
@@ -90,5 +92,38 @@ impl Resource for Mouse {
 
     fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
+    }
+}
+
+impl TemplateGenerator for Mouse {
+    fn write_wgsl_template(
+        writer: &mut dyn std::fmt::Write,
+        bind_group_index: u32,
+    ) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+// x: x-coord when the mouse is pressed
+// y: y-coord when the mouse is pressed
+// z: x-coord when the mouse is released
+// w: y-coord when the mouse is released
+@group({}) @binding({})
+var<uniform> iMouse: vec4<f32>;
+",
+            bind_group_index,
+            Self::binding()
+        ))
+    }
+
+    fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+// x: x-coord when the mouse is pressed
+// y: y-coord when the mouse is pressed
+// z: x-coord when the mouse is released
+// w: y-coord when the mouse is released
+layout(binding = {}) uniform vec4 iMouse;
+",
+            Self::binding()
+        ))
     }
 }

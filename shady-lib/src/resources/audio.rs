@@ -1,9 +1,13 @@
+use std::fmt;
+
 use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
 use wgpu::Device;
 
+use crate::template::TemplateGenerator;
+
 use super::Resource;
 
-const AUDIO_BUFFER_SIZE: usize = 10;
+const AUDIO_BUFFER_SIZE: usize = 20;
 
 pub struct Audio {
     shady_audio: ShadyAudio,
@@ -11,7 +15,6 @@ pub struct Audio {
     audio_buffer: Box<[f32; AUDIO_BUFFER_SIZE]>,
 
     buffer: wgpu::Buffer,
-    binding: u32,
 }
 
 impl Audio {
@@ -28,7 +31,7 @@ impl Audio {
 impl Resource for Audio {
     type BufferDataType = [f32; AUDIO_BUFFER_SIZE];
 
-    fn new(device: &Device, binding: u32) -> Self {
+    fn new(device: &Device) -> Self {
         let buffer = Self::create_storage_buffer(device);
 
         let shady_audio = ShadyAudio::new(
@@ -42,7 +45,6 @@ impl Resource for Audio {
             shady_audio,
             audio_buffer,
             buffer,
-            binding,
         }
     }
 
@@ -58,12 +60,41 @@ impl Resource for Audio {
         wgpu::BufferBindingType::Storage { read_only: true }
     }
 
-    fn binding(&self) -> u32 {
-        self.binding
+    fn binding() -> u32 {
+        super::BindingValue::Audio as u32
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
         let data = &self.audio_buffer;
         queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(data.as_slice()));
+    }
+}
+
+impl TemplateGenerator for Audio {
+    fn write_wgsl_template(
+        writer: &mut dyn std::fmt::Write,
+        bind_group_index: u32,
+    ) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+@group({}) @binding({})
+var<storage, read> iAudio: array<f32, {}>;
+",
+            bind_group_index,
+            Self::binding(),
+            AUDIO_BUFFER_SIZE
+        ))
+    }
+
+    fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+layout(binding = {}) buffer iAudio {{
+    float freqs[{}];
+}};
+",
+            Self::binding(),
+            AUDIO_BUFFER_SIZE
+        ))
     }
 }

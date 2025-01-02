@@ -1,6 +1,8 @@
-use std::time::Instant;
+use std::{fmt, time::Instant};
 
 use wgpu::Device;
+
+use crate::template::TemplateGenerator;
 
 use super::Resource;
 
@@ -9,19 +11,17 @@ pub struct Time {
     time: Instant,
 
     buffer: wgpu::Buffer,
-    binding: u32,
 }
 
 impl Resource for Time {
     type BufferDataType = f32;
 
-    fn new(device: &Device, binding: u32) -> Self {
+    fn new(device: &Device) -> Self {
         let buffer = Self::create_uniform_buffer(device);
 
         Self {
             time: Instant::now(),
             buffer,
-            binding,
         }
     }
 
@@ -33,8 +33,8 @@ impl Resource for Time {
         wgpu::BufferBindingType::Uniform
     }
 
-    fn binding(&self) -> u32 {
-        self.binding
+    fn binding() -> u32 {
+        super::BindingValue::Time as u32
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
@@ -45,5 +45,30 @@ impl Resource for Time {
 
     fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
+    }
+}
+
+impl TemplateGenerator for Time {
+    fn write_wgsl_template(
+        writer: &mut dyn std::fmt::Write,
+        bind_group_index: u32,
+    ) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+@group({}) @binding({})
+var<uniform> iTime: f32;
+",
+            bind_group_index,
+            Self::binding()
+        ))
+    }
+
+    fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+layout(binding = {}) uniform float iTime;
+",
+            Self::binding()
+        ))
     }
 }

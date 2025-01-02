@@ -1,17 +1,22 @@
 mod descriptor;
 mod resources;
 mod shader_language;
+mod template;
 mod vertices;
 
 use resources::Resources;
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
+use template::TemplateGenerator;
 use tracing::instrument;
 use wgpu::{CommandEncoder, Device, TextureView};
 
 pub use descriptor::ShadyDescriptor;
 pub use resources::MouseState;
-pub use shader_language::{Glsl, ShaderLanguage, Wgsl};
+pub use shader_language::{Glsl, ShaderParser, Wgsl};
+pub use template::TemplateLang;
 pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
+
+pub const FRAGMENT_ENTRYPOINT: &str = "main";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -29,10 +34,10 @@ pub enum Error {
     InvalidGlslFragmentShader(String),
 }
 
-pub struct Shady<S: ShaderLanguage> {
+pub struct Shady<P: ShaderParser> {
     resources: Resources,
     pub bind_group: wgpu::BindGroup,
-    shader_parser: S,
+    shader_parser: P,
 
     pipeline: wgpu::RenderPipeline,
     bind_group_index: u32,
@@ -45,7 +50,7 @@ pub struct Shady<S: ShaderLanguage> {
 }
 
 // General functions
-impl<SL: ShaderLanguage> Shady<SL> {
+impl<P: ShaderParser> Shady<P> {
     #[instrument(level = "trace")]
     pub fn new(desc: &ShadyDescriptor) -> Result<Self, Error> {
         let ShadyDescriptor {
@@ -57,12 +62,12 @@ impl<SL: ShaderLanguage> Shady<SL> {
         } = desc;
 
         let resources = Resources::new(device);
-        let mut shader_parser = SL::new();
+        let mut shader_parser = P::new();
 
         let bind_group = resources.bind_group(device);
 
         let pipeline = {
-            let bind_group_layout = resources.bind_group_layout(device);
+            let bind_group_layout = Resources::bind_group_layout(device);
 
             get_render_pipeline(
                 device,
@@ -114,7 +119,7 @@ impl<SL: ShaderLanguage> Shady<SL> {
         fragment_shader: S,
     ) -> Result<(), Error> {
         self.resources.frame.reset_counter();
-        let bind_group_layout = self.resources.bind_group_layout(device);
+        let bind_group_layout = Resources::bind_group_layout(device);
 
         self.pipeline = get_render_pipeline(
             device,
@@ -129,7 +134,7 @@ impl<SL: ShaderLanguage> Shady<SL> {
 }
 
 /// Updating functions
-impl<F: ShaderLanguage> Shady<F> {
+impl<P: ShaderParser> Shady<P> {
     pub fn update_resolution(&mut self, width: u32, height: u32) {
         debug_assert!(width > 0);
         debug_assert!(height > 0);
@@ -151,10 +156,10 @@ impl<F: ShaderLanguage> Shady<F> {
     }
 }
 
-pub fn get_render_pipeline<S: AsRef<str>, SL: ShaderLanguage>(
+fn get_render_pipeline<S: AsRef<str>, P: ShaderParser>(
     device: &Device,
     fragment_shader: S,
-    shader_parser: &mut SL,
+    shader_parser: &mut P,
     bind_group_layout: wgpu::BindGroupLayout,
     texture_format: &wgpu::TextureFormat,
 ) -> Result<wgpu::RenderPipeline, Error> {
@@ -217,4 +222,53 @@ pub fn get_render_pipeline<S: AsRef<str>, SL: ShaderLanguage>(
     });
 
     Ok(pipeline)
+}
+
+pub fn get_template(
+    lang: TemplateLang,
+    writer: &mut dyn std::fmt::Write,
+) -> Result<(), fmt::Error> {
+    match lang {
+        TemplateLang::Wgsl { bind_group_index } => {
+            Resources::write_wgsl_template(writer, bind_group_index)?;
+
+            writer.write_fmt(format_args!(
+                "
+@fragment
+fn {}(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {{
+    let uv = pos.xy/iResolution.xy;
+    let col = 0.5 + 0.5 * cos(iTime + uv.xyx + vec3<f32>(0.0, 2.0, 4.0));
+
+    return vec4<f32>(col, 1.0);
+}}
+",
+                FRAGMENT_ENTRYPOINT
+            ))?;
+        }
+
+        TemplateLang::Glsl => {
+            Resources::write_glsl_template(writer)?;
+
+            writer.write_fmt(format_args!(
+                "
+// the color which the pixel should have
+layout(location = 0) out vec4 fragColor;
+
+void {}() {{
+    // Normalized pixel coordinates (from 0 to 1)
+    vec2 uv = gl_FragCoord.xy/iResolution.xy;
+
+    // Time varying pixel color
+    vec3 col = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
+
+    // Output to screen
+    fragColor = vec4(col,1.0);      
+}}
+",
+                FRAGMENT_ENTRYPOINT
+            ))?;
+        }
+    };
+
+    Ok(())
 }

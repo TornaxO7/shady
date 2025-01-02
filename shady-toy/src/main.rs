@@ -20,8 +20,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop, EventLoopProxy},
 };
 
-pub const WGSL_TEMPLATE: &str = include_str!("template.wgsl");
-pub const GLSL_TEMPLATE: &str = include_str!("template.glsl");
+const SHADY_BIND_GROUP_INDEX: u32 = 0;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -39,6 +38,9 @@ pub enum Error {
 
     #[error("{0}")]
     UnknownShaderFileExtension(String),
+
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,7 +53,7 @@ fn main() -> Result<()> {
     let args = cli::parse();
 
     if args.template {
-        add_template_to_file(&args.fragment_path).map_err(Error::UnknownShaderFileExtension)?;
+        add_template_to_file(&args.fragment_path)?;
     }
 
     if !std::fs::exists(&args.fragment_path).expect("Check if fragment file exists") {
@@ -127,14 +129,24 @@ fn watch_shader_file<P: AsRef<Path>>(path: P, proxy: Arc<EventLoopProxy<UserEven
     Ok(())
 }
 
-fn add_template_to_file(path: &Path) -> Result<(), String> {
-    let frontend = ShaderLanguage::try_from(path)?;
+fn add_template_to_file(path: &Path) -> Result<(), Error> {
+    let frontend =
+        ShaderLanguage::try_from(path).map_err(|msg| Error::UnknownShaderFileExtension(msg))?;
+
+    let mut template = String::new();
 
     match frontend {
-        ShaderLanguage::Wgsl => std::fs::write(path, WGSL_TEMPLATE),
-        ShaderLanguage::Glsl => std::fs::write(path, GLSL_TEMPLATE),
+        ShaderLanguage::Wgsl => shady::get_template(
+            shady::TemplateLang::Wgsl {
+                bind_group_index: SHADY_BIND_GROUP_INDEX,
+            },
+            &mut template,
+        ),
+        ShaderLanguage::Glsl => shady::get_template(shady::TemplateLang::Glsl, &mut template),
     }
     .expect("Write template to given path");
+
+    std::fs::write(path, template)?;
 
     Ok(())
 }

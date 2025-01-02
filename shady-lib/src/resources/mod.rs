@@ -5,6 +5,8 @@ mod mouse;
 mod resolution;
 mod time;
 
+use std::fmt;
+
 #[cfg(feature = "audio")]
 use audio::Audio;
 use frame::Frame;
@@ -16,12 +18,23 @@ use wgpu::Device;
 
 pub use mouse::MouseState;
 
-pub trait Resource {
+use crate::template::TemplateGenerator;
+
+#[repr(u32)]
+enum BindingValue {
+    Time,
+    Resolution,
+    Audio,
+    Mouse,
+    Frame,
+}
+
+pub trait Resource: TemplateGenerator {
     type BufferDataType;
 
-    fn new(device: &Device, binding: u32) -> Self;
+    fn new(device: &Device) -> Self;
 
-    fn binding(&self) -> u32;
+    fn binding() -> u32;
 
     fn buffer_label() -> &'static str;
 
@@ -62,15 +75,13 @@ pub struct Resources {
 impl Resources {
     #[instrument(level = "trace")]
     pub fn new(device: &wgpu::Device) -> Self {
-        const INIT_BINDING: u32 = 0;
-
         Self {
-            time: Time::new(device, INIT_BINDING),
-            resolution: Resolution::new(device, INIT_BINDING + 1),
+            time: Time::new(device),
+            resolution: Resolution::new(device),
             #[cfg(feature = "audio")]
-            audio: Audio::new(device, INIT_BINDING + 2),
-            mouse: Mouse::new(device, INIT_BINDING + 3),
-            frame: Frame::new(device, INIT_BINDING + 4),
+            audio: Audio::new(device),
+            mouse: Mouse::new(device),
+            frame: Frame::new(device),
         }
     }
 
@@ -86,53 +97,50 @@ impl Resources {
     }
 }
 
-/// Methods regardin bind groups
+/// Methods regarding bind groups
 impl Resources {
-    #[instrument(skip(self), level = "trace")]
-    pub fn bind_group_layout(&self, device: &Device) -> wgpu::BindGroupLayout {
+    #[instrument(level = "trace")]
+    pub fn bind_group_layout(device: &Device) -> wgpu::BindGroupLayout {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shady bind group layout"),
             entries: &[
-                bind_group_layout_uniform_entry(self.time.binding(), Time::buffer_type()),
-                bind_group_layout_uniform_entry(
-                    self.resolution.binding(),
-                    Resolution::buffer_type(),
-                ),
+                bind_group_layout_entry(Time::binding(), Time::buffer_type()),
+                bind_group_layout_entry(Resolution::binding(), Resolution::buffer_type()),
                 #[cfg(feature = "audio")]
-                bind_group_layout_uniform_entry(self.audio.binding(), Audio::buffer_type()),
-                bind_group_layout_uniform_entry(self.frame.binding(), Frame::buffer_type()),
-                bind_group_layout_uniform_entry(self.mouse.binding(), Mouse::buffer_type()),
+                bind_group_layout_entry(Audio::binding(), Audio::buffer_type()),
+                bind_group_layout_entry(Frame::binding(), Frame::buffer_type()),
+                bind_group_layout_entry(Mouse::binding(), Mouse::buffer_type()),
             ],
         })
     }
 
     #[instrument(skip(self), level = "trace")]
     pub fn bind_group(&self, device: &Device) -> wgpu::BindGroup {
-        let layout = self.bind_group_layout(device);
+        let layout = Self::bind_group_layout(device);
 
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Shady bind group"),
             layout: &layout,
             entries: &[
                 wgpu::BindGroupEntry {
-                    binding: self.time.binding(),
+                    binding: Time::binding(),
                     resource: self.time.buffer().as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: self.resolution.binding(),
+                    binding: Resolution::binding(),
                     resource: self.resolution.buffer().as_entire_binding(),
                 },
                 #[cfg(feature = "audio")]
                 wgpu::BindGroupEntry {
-                    binding: self.audio.binding(),
+                    binding: Audio::binding(),
                     resource: self.audio.buffer().as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: self.frame.binding(),
+                    binding: Frame::binding(),
                     resource: self.frame.buffer().as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: self.mouse.binding(),
+                    binding: Mouse::binding(),
                     resource: self.mouse.buffer().as_entire_binding(),
                 },
             ],
@@ -140,8 +148,33 @@ impl Resources {
     }
 }
 
+impl TemplateGenerator for Resources {
+    fn write_wgsl_template(
+        writer: &mut dyn fmt::Write,
+        bind_group_index: u32,
+    ) -> Result<(), fmt::Error> {
+        Time::write_wgsl_template(writer, bind_group_index)?;
+        Resolution::write_wgsl_template(writer, bind_group_index)?;
+        Audio::write_wgsl_template(writer, bind_group_index)?;
+        Mouse::write_wgsl_template(writer, bind_group_index)?;
+        Frame::write_wgsl_template(writer, bind_group_index)?;
+
+        Ok(())
+    }
+
+    fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
+        Time::write_glsl_template(writer)?;
+        Resolution::write_glsl_template(writer)?;
+        Audio::write_glsl_template(writer)?;
+        Mouse::write_glsl_template(writer)?;
+        Frame::write_glsl_template(writer)?;
+
+        Ok(())
+    }
+}
+
 #[instrument(level = "trace")]
-fn bind_group_layout_uniform_entry(
+fn bind_group_layout_entry(
     binding: u32,
     ty: wgpu::BufferBindingType,
 ) -> wgpu::BindGroupLayoutEntry {

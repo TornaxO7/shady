@@ -1,4 +1,8 @@
+use std::fmt;
+
 use wgpu::Device;
+
+use crate::template::TemplateGenerator;
 
 use super::Resource;
 
@@ -8,7 +12,6 @@ pub struct Resolution {
     height: u32,
 
     buffer: wgpu::Buffer,
-    binding: u32,
 }
 
 impl Resolution {
@@ -23,14 +26,13 @@ impl Resolution {
 impl Resource for Resolution {
     type BufferDataType = [f32; 2];
 
-    fn new(device: &Device, binding: u32) -> Self {
+    fn new(device: &Device) -> Self {
         let buffer = Self::create_uniform_buffer(device);
 
         Self {
             width: 0,
             height: 0,
             buffer,
-            binding,
         }
     }
 
@@ -42,8 +44,8 @@ impl Resource for Resolution {
         wgpu::BufferBindingType::Uniform
     }
 
-    fn binding(&self) -> u32 {
-        self.binding
+    fn binding() -> u32 {
+        super::BindingValue::Resolution as u32
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
@@ -59,5 +61,34 @@ impl Resource for Resolution {
 
     fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
+    }
+}
+
+impl TemplateGenerator for Resolution {
+    fn write_wgsl_template(
+        writer: &mut dyn std::fmt::Write,
+        bind_group_index: u32,
+    ) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+// x: width
+// y: height
+@group({}) @binding({})
+var<uniform> iResolution: vec2<f32>;
+",
+            bind_group_index,
+            Self::binding()
+        ))
+    }
+
+    fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+// x: width
+// y: height
+layout(binding = {}) uniform vec2 iResolution;
+",
+            Self::binding()
+        ))
     }
 }

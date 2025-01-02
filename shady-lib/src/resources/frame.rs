@@ -1,9 +1,12 @@
+use std::fmt;
+
+use crate::template::TemplateGenerator;
+
 use super::Resource;
 
 pub struct Frame {
     value: u32,
 
-    binding: u32,
     buffer: wgpu::Buffer,
 }
 
@@ -20,18 +23,14 @@ impl Frame {
 impl Resource for Frame {
     type BufferDataType = u32;
 
-    fn new(device: &wgpu::Device, binding: u32) -> Self {
+    fn new(device: &wgpu::Device) -> Self {
         let buffer = Self::create_uniform_buffer(device);
 
-        Self {
-            value: 0,
-            buffer,
-            binding,
-        }
+        Self { value: 0, buffer }
     }
 
-    fn binding(&self) -> u32 {
-        self.binding
+    fn binding() -> u32 {
+        super::BindingValue::Frame as u32
     }
 
     fn buffer_label() -> &'static str {
@@ -48,5 +47,30 @@ impl Resource for Frame {
 
     fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
+    }
+}
+
+impl TemplateGenerator for Frame {
+    fn write_wgsl_template(
+        writer: &mut dyn std::fmt::Write,
+        bind_group_index: u32,
+    ) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+@group({}) @binding({})
+var<uniform> iFrame: u32;
+",
+            bind_group_index,
+            Self::binding()
+        ))
+    }
+
+    fn write_glsl_template(writer: &mut dyn fmt::Write) -> Result<(), fmt::Error> {
+        writer.write_fmt(format_args!(
+            "
+layout(binding = {}) uniform uint iFrame;
+",
+            Self::binding()
+        ))
     }
 }

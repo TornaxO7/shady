@@ -1,6 +1,6 @@
 use image::{ImageBuffer, Rgba};
 use pollster::FutureExt;
-use shady::{ShaderLanguage, Shady, ShadyDescriptor, Wgsl};
+use shady::{ShaderParser, Shady, ShadyDescriptor, Wgsl};
 use wgpu::{
     Backends, Buffer, BufferView, Device, DeviceDescriptor, Extent3d, Instance, Queue, Texture,
 };
@@ -14,7 +14,7 @@ type Bytes = u32;
 const MIN_BYTES_WIDTH: Bytes = 256;
 const OUTPUT_BUFFER_VALUE_SIZE: u32 = std::mem::size_of::<u32>() as u32;
 
-pub struct TextureState<S: ShaderLanguage> {
+pub struct TextureState<S: ShaderParser> {
     size: PhysicalSize<u32>,
     texture: Texture,
     output_buffer: Buffer,
@@ -25,7 +25,7 @@ pub struct TextureState<S: ShaderLanguage> {
     shady: Shady<S>,
 }
 
-impl<S: ShaderLanguage> TextureState<S> {
+impl<S: ShaderParser> TextureState<S> {
     pub fn get_output(&self) -> ImageBuffer<Rgba<u8>, BufferView> {
         let buffer_slice = self.output_buffer.slice(..);
 
@@ -116,7 +116,7 @@ impl<S: ShaderLanguage> TextureState<S> {
     }
 }
 
-impl<S: ShaderLanguage> RenderState<S> for TextureState<S> {
+impl<S: ShaderParser> RenderState<S> for TextureState<S> {
     fn prepare_next_frame(&mut self) {
         self.shady.prepare_next_frame(&mut self.queue);
     }
