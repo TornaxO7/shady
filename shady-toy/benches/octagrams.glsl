@@ -1,15 +1,22 @@
 #version 450
 
-layout(binding = 0) uniform float iTime;
+layout(binding = 0) buffer iAudio {
+    float freqs[20];
+};
+
+layout(binding = 1) uniform uint iFrame;
+
+// x: x-coord when the mouse is pressed
+// y: y-coord when the mouse is pressed
+// z: x-coord when the mouse is released
+// w: y-coord when the mouse is released
+layout(binding = 2) uniform vec4 iMouse;
 
 // x: width
 // y: height
-layout(binding = 1) uniform vec2 iResolution;
+layout(binding = 3) uniform vec2 iResolution;
 
-// x: bass
-// y: mid
-// z: treble
-layout(binding = 2) uniform vec3 iAudio;
+layout(binding = 4) uniform float iTime;
 
 layout(location = 0) out vec4 fragColor;
 
