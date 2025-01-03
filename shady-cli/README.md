@@ -3,6 +3,10 @@
 It's a [cava] inspired audio visualizer for the terminal which I developed to have a visualization
 of [shady-audio].
 
+# Demo
+
+[![Demo video](https://img.youtube.com/vi/FnB8QZckJlM/maxresdefault.jpg)](https://www.youtube.com/watch?v=FnB8QZckJlM)
+
 # Usage
 
 The keybindings are:
