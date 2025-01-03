@@ -9,7 +9,7 @@ license = "GPL-3.0-or-later"
 [dependencies]
 bytemuck = { version = "1", features = ["derive"] }
 
-shady-audio = { path = "../shady-audio" }
+shady-audio = { path = "../shady-audio", optional = true }
 
 wgpu.workspace = true
 tracing.workspace = true
@@ -24,6 +24,6 @@ default = ["time", "resolution", "audio", "mouse", "frame"]
 
 time = []
 resolution = []
-audio = []
+audio = ["dep:shady-audio"]
 mouse = []
 frame = []
