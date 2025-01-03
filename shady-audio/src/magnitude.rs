@@ -1,5 +1,4 @@
 use realfft::num_complex::Complex32;
-use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::{END_FREQ, START_FREQ};
 
@@ -7,9 +6,16 @@ const BUFFER_SIZE: usize = crate::fft::FFT_OUTPUT_SIZE;
 const AMOUNT_HIGHEST_MAGNITUDES: usize = 4;
 const GRAVITY_VAL: f32 = 0.95;
 
+const _: () = const {
+    assert!(
+        AMOUNT_HIGHEST_MAGNITUDES % 2 == 0,
+        "For faster checking if the index in AvgRingBuffer is within the array-length."
+    );
+};
+
 #[derive(Debug)]
 pub struct Magnitudes {
-    highest_magnitudes: AllocRingBuffer<f32>,
+    highest_magnitudes: AvgRingBuffer,
 
     buffers: DoubleBuffer<f32>,
 
@@ -18,13 +24,13 @@ pub struct Magnitudes {
 
 impl Magnitudes {
     pub fn new() -> Self {
-        let highest_magnitudes = AllocRingBuffer::new(AMOUNT_HIGHEST_MAGNITUDES);
+        let highest_avg_magnitudes = AvgRingBuffer::new();
 
         let magnitude_out = Box::new([0.; BUFFER_SIZE]);
         let buffers = DoubleBuffer::new(0., BUFFER_SIZE);
 
         Self {
-            highest_magnitudes,
+            highest_magnitudes: highest_avg_magnitudes,
             buffers,
             magnitude_out,
         }
@@ -91,7 +97,7 @@ impl Magnitudes {
     }
 
     fn current_highest_magnitude(&self) -> f32 {
-        self.highest_magnitudes.iter().sum::<f32>() / AMOUNT_HIGHEST_MAGNITUDES as f32 * 1.25
+        self.highest_magnitudes.avg()
     }
 }
 
@@ -147,5 +153,59 @@ impl<T> DoubleBuffer<T> {
         let end = self.capacity * (1 + offset);
 
         (start, end)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AvgRingBuffer {
+    inner: Box<[f32]>,
+    index: usize,
+}
+
+impl AvgRingBuffer {
+    pub fn new() -> Self {
+        Self {
+            inner: vec![0.; AMOUNT_HIGHEST_MAGNITUDES].into_boxed_slice(),
+            index: 0,
+        }
+    }
+
+    pub fn push(&mut self, val: f32) {
+        self.inner[self.index] = val;
+
+        self.index = (self.index + 1) & !(1 << (AMOUNT_HIGHEST_MAGNITUDES / 2));
+    }
+
+    pub fn avg(&self) -> f32 {
+        self.inner.iter().sum::<f32>() / self.inner.len() as f32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod avg_ring_buffer {
+        use super::*;
+
+        #[test]
+        fn add_to_full_array() {
+            let mut buffer = AvgRingBuffer::new();
+
+            for i in 0..AMOUNT_HIGHEST_MAGNITUDES {
+                buffer.push(i as f32);
+            }
+
+            assert_eq!(
+                *buffer.inner.last().unwrap() as usize,
+                AMOUNT_HIGHEST_MAGNITUDES - 1
+            );
+
+            assert_eq!(
+                buffer.index, 0,
+                "Index did not went to the begininng. Index is at: {}",
+                buffer.index
+            );
+        }
     }
 }

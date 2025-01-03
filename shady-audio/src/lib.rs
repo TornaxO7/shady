@@ -50,6 +50,7 @@ pub mod fetcher;
 mod audio_spline;
 mod fft;
 mod magnitude;
+mod ring_buffer;
 mod timer;
 
 pub use audio_spline::FreqSpline;

@@ -15,6 +15,5 @@ cpal.workspace = true
 realfft.workspace = true
 tracing.workspace = true
 
-ringbuffer = "0.15"
 apodize = "1"
 simple-easing = "1"
