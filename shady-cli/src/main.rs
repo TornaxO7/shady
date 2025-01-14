@@ -44,17 +44,16 @@ fn main() -> std::io::Result<()> {
             .expect("Render frame");
 
         if event::poll(Duration::from_millis(1000 / 60))? {
-            match event::read()? {
-                Event::Key(KeyEvent { code, .. }) => match code {
+            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                match code {
                     KeyCode::Char('q') => break,
                     KeyCode::Char('+') => ctx.bar_width += 1,
                     KeyCode::Char('-') => {
-                        ctx.bar_width = std::cmp::min(std::cmp::max(ctx.bar_width - 1, 1), 300);
+                        ctx.bar_width = (ctx.bar_width - 1).clamp(1, 300);
                         tracing::debug!("width: {}", ctx.bar_width);
                     }
                     _ => {}
-                },
-                _ => {}
+                }
             }
         }
     }

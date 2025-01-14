@@ -62,7 +62,7 @@ impl FreqSpline {
 
             // `-1` in order to for the last point to be at x = 1.
             let step = 1. / (amount_points - 1) as f32;
-            for i in 0..amount_points as usize {
+            for i in 0..amount_points {
                 let x = i as f32 * step;
                 let key = Key::new(x, 0.0, splines::Interpolation::Linear);
                 spline.add(key);
@@ -147,7 +147,7 @@ fn check_1_0_point_exists(keys: &[Key<f32, f32>]) {
     let last_key = keys.last().unwrap();
 
     debug_assert!(
-        (1.0 - last_key.t) < f32::EPSILON,
+        (1.0 - last_key.t).abs() < f32::EPSILON,
         "Missing the last point at t = 1.0 of the spline. Keys:\n{:#?}",
         keys
     );

@@ -46,7 +46,7 @@ impl Magnitudes {
 
     pub fn update_with_ease(&mut self, ease_time: f32) -> &[f32] {
         debug_assert!(
-            0.0 <= ease_time && ease_time <= 1.,
+            (0.0..=1.).contains(&ease_time),
             "`ease_time` ({}) must be between 0 and 1",
             ease_time
         );
@@ -70,10 +70,8 @@ impl Magnitudes {
             let mag = val.norm();
             prev_buffer[i] = mag;
 
-            if START_FREQ <= i && i <= END_FREQ {
-                if mag > max {
-                    max = mag;
-                }
+            if (START_FREQ..=END_FREQ).contains(&i) && mag > max {
+                max = mag;
             }
         }
 

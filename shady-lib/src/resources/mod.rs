@@ -70,7 +70,7 @@ pub trait Resource: TemplateGenerator {
 
     fn create_storage_buffer(device: &Device) -> wgpu::Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some(&Self::buffer_label()),
+            label: Some(Self::buffer_label()),
             size: std::mem::size_of::<Self::BufferDataType>() as u64,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,

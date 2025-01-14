@@ -17,20 +17,18 @@ pub const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
 /// use shady_audio::{fetcher::DummyFetcher, ShadyAudio, config::ShadyAudioConfig};
 /// use std::time::Duration;
 ///
-/// fn main() {
-///     let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
+/// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
 ///
-///     // ... do some wild stuff ...
+/// // ... do some wild stuff ...
 ///
-///     // maybe... we would like to change something :>
-///     // Let it fetch the latest data faster.
-///     let new_config = ShadyAudioConfig {
-///         refresh_time: Duration::from_millis(50),
-///         .. Default::default()
-///     };
+/// // maybe... we would like to change something :>
+/// // Let it fetch the latest data faster.
+/// let new_config = ShadyAudioConfig {
+///     refresh_time: Duration::from_millis(50),
+///     .. Default::default()
+/// };
 ///
-///     shady_audio.update_config(new_config);
-/// }
+/// shady_audio.update_config(new_config);
 /// ```
 ///
 /// [ShadyAudio]: crate::ShadyAudio

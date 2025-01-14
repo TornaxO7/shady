@@ -130,8 +130,7 @@ fn watch_shader_file<P: AsRef<Path>>(path: P, proxy: Arc<EventLoopProxy<UserEven
 }
 
 fn add_template_to_file(path: &Path) -> Result<(), Error> {
-    let frontend =
-        ShaderLanguage::try_from(path).map_err(|msg| Error::UnknownShaderFileExtension(msg))?;
+    let frontend = ShaderLanguage::try_from(path).map_err(Error::UnknownShaderFileExtension)?;
 
     let mut template = String::new();
 
