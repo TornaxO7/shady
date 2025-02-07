@@ -48,8 +48,6 @@ fn main() -> std::io::Result<()> {
         if prev_columns != window_size.columns {
             prev_columns = window_size.columns;
 
-            tracing::debug!("Wanted bars: {}", window_size.columns / ctx.bar_width);
-
             audio.set_bars(
                 NonZeroUsize::new(usize::from(window_size.columns / ctx.bar_width)).unwrap(),
             );
