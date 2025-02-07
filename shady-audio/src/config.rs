@@ -1,13 +1,23 @@
 //! Module to configure the behaviour of [ShadyAudio].
 //!
 //! [ShadyAudio]: crate::ShadyAudio
-use std::time::Duration;
+use std::{
+    num::{NonZero, NonZeroU32, NonZeroUsize},
+    ops::Range,
+    time::Duration,
+};
 
 /// Default value for [ShadyAudioConfig.refresh_time].
 /// Set to `100` millis.
 ///
 /// [ShadyAudioConfig.refresh_time]: struct.ShadyAudioConfig.html#structfield.refresh_time
 pub const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
+
+#[derive(thiserror::Error, Debug, Clone)]
+pub enum ConfigError {
+    #[error("Frequency rang can't be empty but you gave: {0:?}")]
+    EmptyFreqRange(Range<NonZeroU32>),
+}
 
 /// Configure the behaviour of [ShadyAudio] by setting the appropriate values in this struct
 /// and give it to [ShadyAudio].
@@ -32,7 +42,7 @@ pub const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
 /// ```
 ///
 /// [ShadyAudio]: crate::ShadyAudio
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub struct ShadyAudioConfig {
     /// The duration how long shady should wait, until it should fetch
     /// from the audio source again.
@@ -41,14 +51,36 @@ pub struct ShadyAudioConfig {
     /// music visualizer becomes.
     ///
     /// # Default
-    /// See [DEFAULT_REFRESH_TIME].
+    /// See [DEFAULT_REFRESH_TIME
     pub refresh_time: Duration,
+
+    pub amount_bars: NonZeroUsize,
+
+    pub freq_range: Range<NonZeroU32>,
+}
+
+impl ShadyAudioConfig {
+    pub fn validate(&self) -> Result<(), Vec<ConfigError>> {
+        let mut errors = Vec::new();
+
+        if self.freq_range.is_empty() {
+            errors.push(ConfigError::EmptyFreqRange(self.freq_range.clone()))
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for ShadyAudioConfig {
     fn default() -> Self {
         Self {
             refresh_time: DEFAULT_REFRESH_TIME,
+            amount_bars: NonZeroUsize::new(32).unwrap(),
+            freq_range: NonZeroU32::new(50).unwrap()..NonZero::new(15_000).unwrap(),
         }
     }
 }

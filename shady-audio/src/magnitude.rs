@@ -1,8 +1,4 @@
 use realfft::num_complex::Complex32;
-
-use crate::{END_FREQ, START_FREQ};
-
-const BUFFER_SIZE: usize = crate::fft::FFT_OUTPUT_SIZE;
 const AMOUNT_HIGHEST_MAGNITUDES: usize = 4;
 const GRAVITY_VAL: f32 = 0.95;
 
@@ -14,26 +10,11 @@ const _: () = const {
 };
 
 #[derive(Debug)]
-pub struct Magnitudes {
-    highest_magnitudes: AvgRingBuffer,
-
-    buffers: DoubleBuffer<f32>,
-
-    magnitude_out: Box<[f32; BUFFER_SIZE]>,
-}
+pub struct Magnitudes {}
 
 impl Magnitudes {
     pub fn new() -> Self {
-        let highest_avg_magnitudes = AvgRingBuffer::new();
-
-        let magnitude_out = Box::new([0.; BUFFER_SIZE]);
-        let buffers = DoubleBuffer::new(0., BUFFER_SIZE);
-
-        Self {
-            highest_magnitudes: highest_avg_magnitudes,
-            buffers,
-            magnitude_out,
-        }
+        Self {}
     }
 
     pub fn update_magnitudes(&mut self, fft_output: &[Complex32]) -> &[f32] {

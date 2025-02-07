@@ -1,5 +1,9 @@
 use clap::Parser;
-use std::{fs::File, time::Duration};
+use std::{
+    fs::File,
+    num::{NonZeroU32, NonZeroUsize},
+    time::Duration,
+};
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
@@ -34,10 +38,22 @@ fn main() -> std::io::Result<()> {
     let mut audio = ShadyAudio::new(
         SystemAudioFetcher::default(|err| panic!("{}", err)),
         ShadyAudioConfig::default(),
-    );
+    )
+    .unwrap();
+
+    let mut prev_columns = 0;
 
     loop {
         let window_size = crossterm::terminal::window_size()?;
+        if prev_columns != window_size.columns {
+            prev_columns = window_size.columns;
+
+            tracing::debug!("Wanted bars: {}", window_size.columns / ctx.bar_width);
+
+            audio.set_bars(
+                NonZeroUsize::new(usize::from(window_size.columns / ctx.bar_width)).unwrap(),
+            );
+        }
 
         terminal
             .draw(|frame| draw(frame, &mut audio, window_size, &ctx))
@@ -66,12 +82,11 @@ fn draw(frame: &mut Frame, audio: &mut ShadyAudio, window_size: WindowSize, ctx:
     const MAX_HEIGHT: u64 = 100;
 
     let bar_group = {
-        let spline = audio.get_spline();
+        let bar_values = audio.get_bars();
+
         let mut bars = Vec::with_capacity(window_size.columns.into());
         for column in 0..window_size.columns / ctx.bar_width {
-            let frac = (column as f32) / (window_size.columns as f32 / ctx.bar_width as f32);
-
-            let value = spline.sample(frac).unwrap_or(0.0);
+            let value = bar_values[column as usize];
             bars.push(
                 Bar::default()
                     .text_value("".to_string())

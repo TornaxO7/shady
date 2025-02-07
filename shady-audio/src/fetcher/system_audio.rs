@@ -5,16 +5,50 @@ use cpal::{
     SampleFormat, SampleRate, StreamError, SupportedStreamConfigRange,
 };
 
-use super::{Fetcher, DEFAULT_SAMPLE_RATE};
-use crate::fft;
+use super::Fetcher;
 
-const BUFFER_SIZE: usize = fft::FFT_INPUT_SIZE;
+struct SampleBuffer {
+    buffer: Box<[f32]>,
+    length: usize,
+    capacity: usize,
+}
+
+impl SampleBuffer {
+    pub fn new(sample_rate: SampleRate) -> Self {
+        let capacity = (sample_rate.0 * 10) as usize;
+        let buffer = vec![0.; capacity].into_boxed_slice();
+
+        Self {
+            buffer,
+            capacity,
+            length: 0,
+        }
+    }
+
+    pub fn push_before(&mut self, data: &[f32]) {
+        let new_len = std::cmp::min(self.capacity, self.length + data.len());
+
+        // move the current values to the right
+        self.buffer
+            .copy_within(..self.length, new_len - self.length);
+        // copy the new data to the beginning
+        self.buffer[..data.len()].copy_from_slice(data);
+
+        self.length += data.len();
+    }
+
+    pub fn clear(&mut self) {
+        self.length = 0;
+    }
+}
 
 /// Fetcher for the system audio.
 ///
 /// It's recommended to use [SystemAudio::default] to create a new instance of this struct.
 pub struct SystemAudio {
-    data_buffer: Arc<Mutex<Vec<f32>>>,
+    sample_buffer: Arc<Mutex<SampleBuffer>>,
+    sample_rate: SampleRate,
+
     _stream: cpal::Stream,
 }
 
@@ -53,53 +87,40 @@ impl SystemAudio {
                 supported_stream_config.channels()
             );
 
-            supported_stream_config
-                .try_with_sample_rate(SampleRate(DEFAULT_SAMPLE_RATE as u32))
-                .unwrap_or_else(|| todo!("We currently support only stream configs which are able to provide a sample rate of 44.100Hz."))
-                .config()
+            supported_stream_config.with_max_sample_rate().config()
         };
 
-        let data_buffer = Arc::new(Mutex::new(Vec::with_capacity(BUFFER_SIZE)));
+        let sample_rate = stream_config.sample_rate;
 
-        let stream = device
-            .build_input_stream(
-                &stream_config,
-                {
-                    let buffer = data_buffer.clone();
-                    debug_assert_eq!(
-                        stream_config.channels, 1,
-                        "We are currently only supporting 1 channel"
-                    );
+        let sample_buffer = {
+            let buffer = SampleBuffer::new(sample_rate);
+            Arc::new(Mutex::new(buffer))
+        };
 
-                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                        let mut buf = buffer.lock().unwrap();
+        let stream = {
+            let stream = device
+                .build_input_stream(
+                    &stream_config,
+                    {
+                        let buffer = sample_buffer.clone();
+                        move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                            let mut buf = buffer.lock().unwrap();
+                            buf.push_before(data);
+                        }
+                    },
+                    error_callback,
+                    None,
+                )
+                .expect("Start audio listening");
+            stream.play().expect("Start listening to audio");
 
-                        let buf_len = buf.len();
-                        // don't let the vec exceed the capacity
-                        let new_len = std::cmp::min(buf_len + data.len(), BUFFER_SIZE - 1);
-                        buf.resize(new_len, 0.);
-                        // prepare the space for the new data
-                        buf.copy_within(..buf_len, new_len - buf_len);
-                        // put the new data to the beginning of the vec
-                        buf[..data.len()].copy_from_slice(data);
-
-                        debug_assert_eq!(
-                            buf.capacity(),
-                            BUFFER_SIZE,
-                            "The buffer should be fixed sized!"
-                        );
-                    }
-                },
-                error_callback,
-                None,
-            )
-            .expect("Start audio listening");
-
-        stream.play().expect("Start listening to audio");
+            stream
+        };
 
         Box::new(Self {
             _stream: stream,
-            data_buffer,
+            sample_buffer,
+            sample_rate,
         })
     }
 
@@ -137,18 +158,15 @@ impl Drop for SystemAudio {
 }
 
 impl Fetcher for SystemAudio {
-    fn fetch_snapshot(&mut self, buf: &mut [f32]) {
-        let mut audio = self.data_buffer.lock().unwrap();
+    fn fetch_samples(&mut self, buf: &mut Vec<f32>) {
+        let mut sample_buffer = self.sample_buffer.lock().unwrap();
+        buf.resize(sample_buffer.length, 0.);
+        buf.copy_from_slice(&sample_buffer.buffer[..sample_buffer.length]);
+        sample_buffer.clear();
+    }
 
-        // adjust buf
-        let audio_len = audio.len();
-        let buf_len = buf.len();
-        let mid = std::cmp::min(audio_len, buf_len);
-
-        buf.copy_within(..(buf_len - mid), mid);
-        buf[..mid].copy_from_slice(&audio);
-
-        audio.clear();
+    fn sample_rate(&self) -> SampleRate {
+        self.sample_rate
     }
 }
 
@@ -156,11 +174,7 @@ fn default_output_config(device: &cpal::Device) -> SupportedStreamConfigRange {
     let mut matching_configs: Vec<_> = device
         .supported_output_configs()
         .expect("Get supported output configs of device")
-        .filter(|entry| {
-            entry.channels() == 1
-                && entry.sample_format() == SampleFormat::F32
-                && entry.min_sample_rate() <= SampleRate(DEFAULT_SAMPLE_RATE as u32)
-        })
+        .filter(|entry| entry.channels() == 1 && entry.sample_format() == SampleFormat::F32)
         .collect();
 
     matching_configs.sort_by(|a, b| a.cmp_default_heuristics(b));

@@ -2601,6 +2601,7 @@ dependencies = [
  "realfft",
  "simple-easing",
  "splines",
+ "thiserror 2.0.8",
  "tracing",
 ]
 

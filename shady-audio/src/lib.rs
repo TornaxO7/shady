@@ -45,38 +45,46 @@
 pub mod config;
 pub mod fetcher;
 
-mod audio_spline;
+// mod audio_spline;
+// mod engine;
+mod equalizer;
 mod fft;
-mod magnitude;
-mod ring_buffer;
-mod timer;
+// mod magnitude;
+// mod ring_buffer;
+// mod timer;
 
-pub use audio_spline::FreqSpline;
+// pub use audio_spline::FreqSpline;
 pub use cpal;
 
-use config::ShadyAudioConfig;
+use config::{ConfigError, ShadyAudioConfig};
+use cpal::SampleRate;
+use equalizer::Equalizer;
 use fetcher::Fetcher;
 use fft::FftCalculator;
-use magnitude::Magnitudes;
-use timer::Timer;
+use std::{num::NonZeroUsize, ops::Range};
 
-type Hz = usize;
+type Hz = u32;
 
 // The starting frequency from where the spline will collect/create its points.
-const START_FREQ: Hz = 20;
+// const START_FREQ: Hz = 20;
 // The ending frequency from where the spline will stop collecting/create its points.
-const END_FREQ: Hz = 15_000;
+// const END_FREQ: Hz = 15_000
+
+struct State {
+    pub amount_bars: usize,
+    pub sample_rate: SampleRate,
+    pub freq_range: Range<Hz>,
+}
 
 /// The main struct to interact with the crate.
 pub struct ShadyAudio {
-    fft_input: Box<[f32; fft::FFT_INPUT_SIZE]>,
+    state: State,
+    sample_buffer: Vec<f32>,
 
     fetcher: Box<dyn Fetcher>,
     fft: FftCalculator,
-    spline: FreqSpline,
-    magnitudes: Magnitudes,
-
-    timer: Timer,
+    equalizer: Equalizer,
+    // timer: Timer,
 }
 
 impl ShadyAudio {
@@ -88,38 +96,79 @@ impl ShadyAudio {
     ///
     /// let shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
     /// ```
-    pub fn new(fetcher: Box<dyn Fetcher>, config: ShadyAudioConfig) -> Self {
-        Self {
+    pub fn new(
+        fetcher: Box<dyn Fetcher>,
+        config: ShadyAudioConfig,
+    ) -> Result<Self, Vec<ConfigError>> {
+        config.validate()?;
+
+        let state = State {
+            amount_bars: usize::from(config.amount_bars),
+            sample_rate: fetcher.sample_rate(),
+            freq_range: Hz::from(config.freq_range.start)..Hz::from(config.freq_range.end),
+        };
+
+        let sample_buffer = Vec::with_capacity(state.sample_rate.0 as usize);
+        let fft = FftCalculator::new(state.sample_rate);
+        let equalizer = Equalizer::new(
+            state.amount_bars,
+            state.freq_range.clone(),
+            fft.size(),
+            state.sample_rate,
+        );
+
+        Ok(Self {
+            state,
             fetcher,
-            fft: FftCalculator::new(),
-            fft_input: Box::new([0.; fft::FFT_INPUT_SIZE]),
-            spline: FreqSpline::new(),
-            timer: Timer::new(config.refresh_time),
-            magnitudes: Magnitudes::new(),
-        }
+            fft,
+            sample_buffer,
+            equalizer,
+        })
     }
 
     /// Returns you the latest "frequency spline" which describes the presence of each frequency.
     /// The spline basically represents the curve of audio visualizers which are using a bar chart
     /// like [`shady-cli`](https://github.com/TornaxO7/shady/tree/main/shady-cli).
-    pub fn get_spline(&mut self) -> &FreqSpline {
-        let magnitudes = match self.timer.ease_time() {
-            Some(ease_time) => self.magnitudes.update_with_ease(ease_time),
-            None => {
-                let data_buf = self.fft_input.as_mut_slice();
+    // pub fn get_spline(&mut self) -> &FreqSpline {
+    //     let magnitudes = match self.timer.ease_time() {
+    //         Some(ease_time) => self.magnitudes.update_with_ease(ease_time),
+    //         None => {
+    //             let data_buf = self.fft_input.as_mut_slice();
 
-                self.fetcher.fetch_snapshot(data_buf);
-                let fft_out = self.fft.process(data_buf);
-                self.magnitudes.update_magnitudes(fft_out)
-            }
-        };
-        self.spline.update(magnitudes);
+    //             self.fetcher.fetch_snapshot(data_buf);
+    //             let fft_out = self.fft.process(data_buf);
+    //             self.magnitudes.update_magnitudes(fft_out)
+    //         }
+    //     };
+    //     self.spline.update(magnitudes);
 
-        &self.spline
+    //     &self.spline
+    // }
+
+    pub fn get_bars(&mut self) -> &[f32] {
+        // TODO: Fetcher fetcht zu große blöcke, aber dafür in kleineren zeitslots
+        self.fetcher.fetch_samples(&mut self.sample_buffer);
+        let fft_out = self.fft.process(&self.sample_buffer);
+        let bars = self.equalizer.process(fft_out);
+
+        self.sample_buffer.clear();
+
+        bars
     }
 
-    /// Let's you update the internal config if you'd like to change something.
-    pub fn update_config(&mut self, config: ShadyAudioConfig) {
-        self.timer.set_refresh_time(config.refresh_time);
+    pub fn set_bars(&mut self, amount_bars: NonZeroUsize) {
+        self.state.amount_bars = usize::from(amount_bars);
+
+        self.equalizer = Equalizer::new(
+            self.state.amount_bars,
+            self.state.freq_range.clone(),
+            self.fft.size(),
+            self.state.sample_rate,
+        );
     }
+
+    // /// Let's you update the internal config if you'd like to change something.
+    // pub fn update_config(&mut self, config: ShadyAudioConfig) {
+    //     self.timer.set_refresh_time(config.refresh_time);
+    // }
 }
