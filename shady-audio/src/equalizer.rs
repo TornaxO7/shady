@@ -7,10 +7,10 @@ use crate::Hz;
 
 #[derive(Debug)]
 pub struct Equalizer {
-    amount_bars: usize,
-    sample_len: usize,
     bar_values: Box<[f32]>,
     bar_bin_indices: Box<[Range<usize>]>,
+
+    sensitivity: f32,
 }
 
 impl Equalizer {
@@ -38,7 +38,7 @@ impl Equalizer {
                 let mut weights = Vec::new();
 
                 for i in 0..amount_bars {
-                    let weight = (i as f32 + 2.).log2().powf(2.);
+                    let weight = (i as f32 + 2.).log2().powf(20.);
                     weights.push(weight);
                 }
 
@@ -65,29 +65,46 @@ impl Equalizer {
             // add range for the last bar
             ranges.push(start..bin_range.end);
 
-            tracing::debug!("Ranges({}): {:?}", ranges.len(), ranges);
-
             ranges.into_boxed_slice()
         };
 
         Self {
-            amount_bars,
-            sample_len,
             bar_values,
             bar_bin_indices,
+            sensitivity: 1.,
         }
     }
 
     pub fn process(&mut self, fft_out: &[Complex32]) -> &[f32] {
+        let mut overshoot = false;
+        let mut is_silent = true;
         for (i, range) in self.bar_bin_indices.iter().cloned().enumerate() {
-            // let bar_val = fft_out[range].iter().map(|out| out.norm()).sum::<f32>() / range_len;
+            let range_len = range.len();
             let bar_val = fft_out[range]
                 .iter()
-                .map(|out| out.norm())
-                .max_by(|a, b| a.total_cmp(b))
-                .unwrap();
+                .map(|out| {
+                    let mag = out.norm();
+                    if mag > 0. {
+                        is_silent = false;
+                    }
+                    mag
+                })
+                .sum::<f32>()
+                / range_len as f32;
 
-            self.bar_values[i] = bar_val;
+            let log_factor = ((i + 4) as f32).log(4.);
+            let exp_factor = 1.05f32.powf((i + 1) as f32);
+            self.bar_values[i] = bar_val * self.sensitivity * log_factor * exp_factor;
+
+            if self.bar_values[i] > 1. {
+                overshoot = true;
+            }
+        }
+
+        if overshoot {
+            self.sensitivity *= 0.98;
+        } else if !is_silent {
+            self.sensitivity *= 1.002;
         }
 
         &self.bar_values

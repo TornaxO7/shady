@@ -1,20 +1,10 @@
 use clap::Parser;
-use std::{
-    fs::File,
-    num::{NonZeroU32, NonZeroUsize},
-    time::Duration,
-};
+use std::{fs::File, num::NonZeroUsize, time::Duration};
 
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent},
-    terminal::WindowSize,
-};
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
-    style::{Color, Style},
-    widgets::{
-        canvas::{Canvas, Line, Shape},
-        Bar, BarChart, BarGroup,
-    },
+    style::Color,
+    widgets::canvas::{Canvas, Line, Shape},
     Frame,
 };
 use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
@@ -24,7 +14,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 #[command(version, about)]
 struct Ctx {
     /// The bar width
-    #[arg(short, long, default_value_t = 3)]
+    #[arg(short, long, default_value_t = 16)]
     amount_bars: usize,
 
     /// The bar color. For a full list of possible colors: https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html
@@ -45,8 +35,6 @@ fn main() -> std::io::Result<()> {
     .unwrap();
 
     loop {
-        let window = crossterm::terminal::window_size()?;
-
         terminal
             .draw(|frame| draw(frame, &mut audio, &ctx))
             .expect("Render frame");
@@ -91,7 +79,7 @@ fn draw(frame: &mut Frame, audio: &mut ShadyAudio, ctx: &Ctx) {
             for &bar_value in bar_values {
                 r_ctx.draw(&FilledRectangle {
                     x: (x + gap_width) as f64,
-                    width: (slot_width / 8.) as f64,
+                    width: (slot_width / 2.) as f64,
                     height: bar_value as f64,
                     color: Color::Blue,
                 });
