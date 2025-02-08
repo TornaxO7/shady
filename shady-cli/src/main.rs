@@ -11,7 +11,10 @@ use crossterm::{
 };
 use ratatui::{
     style::{Color, Style},
-    widgets::{Bar, BarChart, BarGroup},
+    widgets::{
+        canvas::{Canvas, Line, Shape},
+        Bar, BarChart, BarGroup,
+    },
     Frame,
 };
 use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
@@ -22,7 +25,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 struct Ctx {
     /// The bar width
     #[arg(short, long, default_value_t = 3)]
-    bar_width: u16,
+    amount_bars: usize,
 
     /// The bar color. For a full list of possible colors: https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html
     #[arg(short, long, default_value_t = Color::LightBlue)]
@@ -41,30 +44,24 @@ fn main() -> std::io::Result<()> {
     )
     .unwrap();
 
-    let mut prev_columns = 0;
-
     loop {
-        let window_size = crossterm::terminal::window_size()?;
-        if prev_columns != window_size.columns {
-            prev_columns = window_size.columns;
-
-            audio.set_bars(
-                NonZeroUsize::new(usize::from(window_size.columns / ctx.bar_width)).unwrap(),
-            );
-        }
+        let window = crossterm::terminal::window_size()?;
 
         terminal
-            .draw(|frame| draw(frame, &mut audio, window_size, &ctx))
+            .draw(|frame| draw(frame, &mut audio, &ctx))
             .expect("Render frame");
 
         if event::poll(Duration::from_millis(1000 / 60))? {
             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                 match code {
                     KeyCode::Char('q') => break,
-                    KeyCode::Char('+') => ctx.bar_width += 1,
+                    KeyCode::Char('+') => {
+                        ctx.amount_bars += 1;
+                        audio.set_bars(NonZeroUsize::new(ctx.amount_bars).unwrap());
+                    }
                     KeyCode::Char('-') => {
-                        ctx.bar_width = (ctx.bar_width - 1).clamp(1, 300);
-                        tracing::debug!("width: {}", ctx.bar_width);
+                        ctx.amount_bars = ctx.amount_bars.saturating_sub(1);
+                        audio.set_bars(NonZeroUsize::new(ctx.amount_bars).unwrap());
                     }
                     _ => {}
                 }
@@ -76,34 +73,34 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn draw(frame: &mut Frame, audio: &mut ShadyAudio, window_size: WindowSize, ctx: &Ctx) {
-    const MAX_HEIGHT: u64 = 100;
+fn draw(frame: &mut Frame, audio: &mut ShadyAudio, ctx: &Ctx) {
+    const HEIGHT: f64 = 1.;
+    const WIDTH: f64 = 1.;
 
-    let bar_group = {
-        let bar_values = audio.get_bars();
+    let bar_values = audio.get_bars();
 
-        let mut bars = Vec::with_capacity(window_size.columns.into());
-        for column in 0..window_size.columns / ctx.bar_width {
-            let value = bar_values[column as usize];
-            bars.push(
-                Bar::default()
-                    .text_value("".to_string())
-                    .value((value * MAX_HEIGHT as f32) as u64),
-            );
-        }
+    let canvas = Canvas::default()
+        .x_bounds([0., WIDTH])
+        .y_bounds([0., HEIGHT])
+        .marker(ratatui::symbols::Marker::HalfBlock)
+        .paint(|r_ctx| {
+            let slot_width = WIDTH / ctx.amount_bars as f64;
+            let gap_width = slot_width / 4.;
 
-        BarGroup::default().label("".into()).bars(&bars)
-    };
+            let mut x = 0f64;
+            for &bar_value in bar_values {
+                r_ctx.draw(&FilledRectangle {
+                    x: (x + gap_width) as f64,
+                    width: (slot_width / 8.) as f64,
+                    height: bar_value as f64,
+                    color: Color::Blue,
+                });
 
-    let bar_chart = BarChart::default()
-        .bar_style(Style::new())
-        .data(bar_group)
-        .bar_width(ctx.bar_width)
-        .bar_gap(1)
-        .bar_style(Style::new().fg(ctx.color))
-        .max(MAX_HEIGHT);
+                x += slot_width;
+            }
+        });
 
-    frame.render_widget(&bar_chart, frame.area());
+    frame.render_widget(&canvas, frame.area());
 }
 
 fn init_logger() {
@@ -118,4 +115,30 @@ fn init_logger() {
         .with(fmt_layer)
         .with(EnvFilter::from_env(EnvFilter::DEFAULT_ENV))
         .init();
+}
+
+struct FilledRectangle {
+    x: f64,
+    width: f64,
+    height: f64,
+    color: Color,
+}
+
+impl Shape for FilledRectangle {
+    fn draw(&self, painter: &mut ratatui::widgets::canvas::Painter) {
+        let mut y = 0.;
+
+        while y < self.height {
+            Line {
+                x1: self.x,
+                x2: self.x + self.width,
+                y1: y,
+                y2: y,
+                color: self.color,
+            }
+            .draw(painter);
+
+            y += 0.001;
+        }
+    }
 }

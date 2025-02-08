@@ -17,7 +17,7 @@ impl Equalizer {
     pub fn new(
         amount_bars: usize,
         freq_range: Range<Hz>,
-        sample_len: usize,
+        sample_len: usize, // = fft size
         sample_rate: SampleRate,
     ) -> Self {
         let bar_values = vec![0.; amount_bars].into_boxed_slice();
@@ -26,31 +26,48 @@ impl Equalizer {
             let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
 
             // the relevant index range of the fft output which we should use for the bars
-            let mut bin_range = Range {
+            let bin_range = Range {
                 start: ((freq_range.start as f32 / freq_resolution) as usize).max(1),
-                end: (freq_range.end as f32 / freq_resolution) as usize,
+                end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
             };
 
-            let amount_bins_per_bar = bin_range.len() / amount_bars;
-            // make the range a multiple of the amount of bins we need per bar for nice computation
-            bin_range.end = bin_range.start + amount_bins_per_bar * amount_bars;
-            assert!(
-                amount_bins_per_bar > 0,
-                "One bar needs {} bins but we only have {} bins (for {} bars).",
-                amount_bins_per_bar,
-                bin_range.len(),
-                amount_bars
-            );
+            tracing::debug!("Relevant bin range: {:?}", bin_range);
+            let amount_bins = bin_range.len();
 
-            let mut indices = Vec::new();
+            let weights = {
+                let mut weights = Vec::new();
 
-            let bin_range_len = bin_range.len();
-            for index in bin_range.step_by(amount_bins_per_bar) {
-                let end = (index + amount_bins_per_bar).min(bin_range_len);
-                indices.push(index..end);
+                for i in 0..amount_bars {
+                    let weight = (i as f32 + 2.).log2().powf(2.);
+                    weights.push(weight);
+                }
+
+                weights
+            };
+
+            let weight_sum = weights.iter().sum::<f32>();
+
+            // contains the amount of bins for the i-th bar
+            let mut ranges = Vec::new();
+
+            let mut start = 1;
+            for &weight in weights[..(weights.len() - 1)].iter() {
+                let mut end =
+                    start + ((weight / weight_sum) * (amount_bins as f32)).round() as usize;
+
+                if end == start {
+                    end += 1;
+                }
+                ranges.push(start..end);
+                start = end;
             }
 
-            indices.into_boxed_slice()
+            // add range for the last bar
+            ranges.push(start..bin_range.end);
+
+            tracing::debug!("Ranges({}): {:?}", ranges.len(), ranges);
+
+            ranges.into_boxed_slice()
         };
 
         Self {
@@ -62,23 +79,16 @@ impl Equalizer {
     }
 
     pub fn process(&mut self, fft_out: &[Complex32]) -> &[f32] {
-        // let mut max_bar_value = f32::MIN;
-
         for (i, range) in self.bar_bin_indices.iter().cloned().enumerate() {
-            let range_len = range.len() as f32;
+            // let bar_val = fft_out[range].iter().map(|out| out.norm()).sum::<f32>() / range_len;
+            let bar_val = fft_out[range]
+                .iter()
+                .map(|out| out.norm())
+                .max_by(|a, b| a.total_cmp(b))
+                .unwrap();
 
-            let bar_val = fft_out[range].iter().map(|out| out.norm()).sum::<f32>() / range_len;
-
-            // if bar_val > max_bar_value {
-            //     max_bar_value = bar_val;
-            // }
-
-            self.bar_values[i] = (bar_val / self.sample_len as f32) * 8. * 1.5;
+            self.bar_values[i] = bar_val;
         }
-
-        // for val in self.bar_values.iter_mut() {
-        //     *val /= max_bar_value;
-        // }
 
         &self.bar_values
     }
