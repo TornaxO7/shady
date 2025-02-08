@@ -117,7 +117,7 @@ impl ShadyAudio {
             state.freq_range.clone(),
             fft.size(),
             state.sample_rate,
-            None,
+            Some(0.1),
         );
 
         Ok(Self {

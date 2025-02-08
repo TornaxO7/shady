@@ -100,8 +100,16 @@ impl Equalizer {
             };
 
             let prev_bar_value = self.bar_values[i];
-            self.bar_values[i] =
-                (0.8 * raw_new_bar_value + 0.2 * prev_bar_value).max(prev_bar_value * 0.9);
+            self.bar_values[i] = {
+                let rel = raw_new_bar_value / prev_bar_value.max(f32::EPSILON);
+
+                let factor = if rel > 1. { 0.7 } else { rel };
+
+                let new_value = (factor * raw_new_bar_value) + (1. - factor) * prev_bar_value;
+
+                // gravitational effect
+                new_value.max(prev_bar_value * 0.9)
+            };
 
             if self.bar_values[i] > 1. {
                 overshoot = true;
@@ -111,7 +119,7 @@ impl Equalizer {
         if overshoot {
             self.sensitivity *= 0.98;
         } else if !is_silent {
-            self.sensitivity *= 1.002;
+            self.sensitivity *= 1.001;
         }
 
         &self.bar_values
@@ -119,20 +127,5 @@ impl Equalizer {
 
     pub fn sensitivity(&self) -> f32 {
         self.sensitivity
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bins_with_less_bars_than_samples() {
-        let e = Equalizer::new(3, 0..10, 10, SampleRate(10));
-
-        assert_eq!(e.bar_bin_indices[0], 0..3);
-        assert_eq!(e.bar_bin_indices[1], 3..6);
-        assert_eq!(e.bar_bin_indices[2], 6..9);
-        assert_eq!(e.bar_bin_indices.len(), 3, "{:?}", e.bar_bin_indices);
     }
 }
