@@ -19,6 +19,7 @@ impl Equalizer {
         freq_range: Range<Hz>,
         sample_len: usize, // = fft size
         sample_rate: SampleRate,
+        sensitivity: Option<f32>,
     ) -> Self {
         let bar_values = vec![0.; amount_bars].into_boxed_slice();
 
@@ -31,7 +32,6 @@ impl Equalizer {
                 end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
             };
 
-            tracing::debug!("Relevant bin range: {:?}", bin_range);
             let amount_bins = bin_range.len();
 
             let weights = {
@@ -71,7 +71,7 @@ impl Equalizer {
         Self {
             bar_values,
             bar_bin_indices,
-            sensitivity: 1.,
+            sensitivity: sensitivity.unwrap_or(1.),
         }
     }
 
@@ -92,9 +92,16 @@ impl Equalizer {
                 .sum::<f32>()
                 / range_len as f32;
 
-            let log_factor = ((i + 4) as f32).log(4.);
-            let exp_factor = 1.05f32.powf((i + 1) as f32);
-            self.bar_values[i] = bar_val * self.sensitivity * log_factor * exp_factor;
+            let raw_new_bar_value = {
+                let log_factor = ((i + 4) as f32).log(4.);
+                let exp_factor = 1.05f32.powf((i + 1) as f32);
+
+                bar_val * self.sensitivity * log_factor * exp_factor
+            };
+
+            let prev_bar_value = self.bar_values[i];
+            self.bar_values[i] =
+                (0.8 * raw_new_bar_value + 0.2 * prev_bar_value).max(prev_bar_value * 0.9);
 
             if self.bar_values[i] > 1. {
                 overshoot = true;
@@ -108,6 +115,10 @@ impl Equalizer {
         }
 
         &self.bar_values
+    }
+
+    pub fn sensitivity(&self) -> f32 {
+        self.sensitivity
     }
 }
 

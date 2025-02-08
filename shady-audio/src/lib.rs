@@ -74,6 +74,7 @@ struct State {
     pub amount_bars: usize,
     pub sample_rate: SampleRate,
     pub freq_range: Range<Hz>,
+    pub sensitivity: f32,
 }
 
 /// The main struct to interact with the crate.
@@ -106,6 +107,7 @@ impl ShadyAudio {
             amount_bars: usize::from(config.amount_bars),
             sample_rate: fetcher.sample_rate(),
             freq_range: Hz::from(config.freq_range.start)..Hz::from(config.freq_range.end),
+            sensitivity: 1.,
         };
 
         let sample_buffer = Vec::with_capacity(state.sample_rate.0 as usize);
@@ -115,6 +117,7 @@ impl ShadyAudio {
             state.freq_range.clone(),
             fft.size(),
             state.sample_rate,
+            None,
         );
 
         Ok(Self {
@@ -159,11 +162,14 @@ impl ShadyAudio {
     pub fn set_bars(&mut self, amount_bars: NonZeroUsize) {
         self.state.amount_bars = usize::from(amount_bars);
 
+        self.state.sensitivity = self.equalizer.sensitivity();
+
         self.equalizer = Equalizer::new(
             self.state.amount_bars,
             self.state.freq_range.clone(),
             self.fft.size(),
             self.state.sample_rate,
+            Some(self.state.sensitivity),
         );
     }
 
