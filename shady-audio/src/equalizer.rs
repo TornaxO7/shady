@@ -104,14 +104,19 @@ impl Equalizer {
                 self.bar_values[i] = prev_bar_value * 0.9;
             } else {
                 self.bar_values[i] = {
-                    let rel = raw_new_bar_value / prev_bar_value.max(f32::EPSILON);
+                    let rel_change = raw_new_bar_value / prev_bar_value.max(f32::EPSILON);
 
-                    let factor = if rel > 1. { 0.7 } else { rel };
+                    if rel_change >= 0.1 {
+                        let factor = if rel_change > 1. { 0.8 } else { rel_change };
 
-                    let new_value = (factor * raw_new_bar_value) + (1. - factor) * prev_bar_value;
+                        let new_value =
+                            (factor * raw_new_bar_value) + (1. - factor) * prev_bar_value;
 
-                    // gravitational effect
-                    new_value.max(prev_bar_value * 0.9)
+                        // gravitational effect
+                        new_value.max(prev_bar_value * 0.9)
+                    } else {
+                        prev_bar_value * 0.95
+                    }
                 };
             };
 
