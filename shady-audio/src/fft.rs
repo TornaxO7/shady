@@ -11,7 +11,6 @@ pub struct FftCalculator {
     fft_in_raw: Box<[f32]>,
 
     fft_size: usize,
-    fft_out_size: usize,
 }
 
 impl FftCalculator {
@@ -57,7 +56,6 @@ impl FftCalculator {
             fft_in_raw,
 
             fft_size,
-            fft_out_size,
         }
     }
 
