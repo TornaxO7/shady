@@ -107,7 +107,7 @@ impl ShadyAudio {
             amount_bars: usize::from(config.amount_bars),
             sample_rate: fetcher.sample_rate(),
             freq_range: Hz::from(config.freq_range.start)..Hz::from(config.freq_range.end),
-            sensitivity: 1.,
+            sensitivity: 0.001,
         };
 
         let sample_buffer = Vec::with_capacity(state.sample_rate.0 as usize);
@@ -117,7 +117,7 @@ impl ShadyAudio {
             state.freq_range.clone(),
             fft.size(),
             state.sample_rate,
-            Some(0.1),
+            Some(state.sensitivity),
         );
 
         Ok(Self {
