@@ -16,4 +16,3 @@ tracing.workspace = true
 thiserror.workspace = true
 
 apodize = "1"
-simple-easing = "1"
