@@ -1,5 +1,9 @@
 use clap::Parser;
-use std::{fs::File, num::NonZeroUsize, time::Duration};
+use std::{
+    fs::File,
+    num::{NonZeroU32, NonZeroUsize},
+    time::Duration,
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
@@ -30,7 +34,10 @@ fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
     let mut audio = ShadyAudio::new(
         SystemAudioFetcher::default(|err| panic!("{}", err)),
-        ShadyAudioConfig::default(),
+        ShadyAudioConfig {
+            amount_bars: NonZeroUsize::new(ctx.amount_bars).unwrap(),
+            ..Default::default()
+        },
     )
     .unwrap();
 
@@ -48,7 +55,7 @@ fn main() -> std::io::Result<()> {
                         audio.set_bars(NonZeroUsize::new(ctx.amount_bars).unwrap());
                     }
                     KeyCode::Char('-') => {
-                        ctx.amount_bars = ctx.amount_bars.saturating_sub(1);
+                        ctx.amount_bars = ctx.amount_bars.saturating_sub(1).max(1);
                         audio.set_bars(NonZeroUsize::new(ctx.amount_bars).unwrap());
                     }
                     _ => {}

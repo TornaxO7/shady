@@ -51,7 +51,11 @@ mod equalizer;
 mod fft;
 // mod magnitude;
 // mod ring_buffer;
-// mod timer;
+// mod timer
+
+type Hz = u32;
+pub const MIN_HUMAN_FREQUENCY: Hz = 20;
+pub const MAX_HUMAN_FREQUENCY: Hz = 20_000;
 
 // pub use audio_spline::FreqSpline;
 pub use cpal;
@@ -62,8 +66,6 @@ use equalizer::Equalizer;
 use fetcher::Fetcher;
 use fft::FftCalculator;
 use std::{num::NonZeroUsize, ops::Range};
-
-type Hz = u32;
 
 // The starting frequency from where the spline will collect/create its points.
 // const START_FREQ: Hz = 20;
@@ -107,7 +109,7 @@ impl ShadyAudio {
             amount_bars: usize::from(config.amount_bars),
             sample_rate: fetcher.sample_rate(),
             freq_range: Hz::from(config.freq_range.start)..Hz::from(config.freq_range.end),
-            sensitivity: 0.001,
+            sensitivity: 1.,
         };
 
         let sample_buffer = Vec::with_capacity(state.sample_rate.0 as usize);
