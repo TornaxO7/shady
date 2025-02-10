@@ -1,15 +1,15 @@
-use std::ops::Range;
+use core::f32;
+use std::{ops::Range, time::Duration};
 
 use cpal::SampleRate;
 use realfft::num_complex::Complex32;
-use tracing::instrument;
+use tracing::{debug, instrument};
 
-use crate::{Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
+use crate::{timer::Timer, Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
 
 #[derive(Debug)]
 pub struct Equalizer {
     bar_values: Box<[f32]>,
-    bar_peaks: Box<[f32]>,
     bar_ranges: Box<[Range<usize>]>,
 
     sensitivity: f32,
@@ -25,7 +25,6 @@ impl Equalizer {
         sensitivity: Option<f32>,
     ) -> Self {
         let bar_values = vec![0.; amount_bars].into_boxed_slice();
-        let bar_peaks = bar_values.clone();
 
         let bar_ranges = {
             let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
@@ -73,7 +72,6 @@ impl Equalizer {
         };
 
         Self {
-            bar_peaks,
             bar_values,
             bar_ranges,
             sensitivity: sensitivity.unwrap_or(1.),
@@ -106,11 +104,12 @@ impl Equalizer {
             debug_assert!(!prev_magnitude.is_nan());
             debug_assert!(!next_magnitude.is_nan());
 
-            self.bar_values[i] = 0.8 * next_magnitude + 0.2 * prev_magnitude;
-
-            // animation up
-
-            // animation down
+            let rel_change = next_magnitude / prev_magnitude;
+            if is_silent {
+                self.bar_values[i] *= 0.75;
+            } else {
+                self.bar_values[i] += (next_magnitude - prev_magnitude) * rel_change.min(0.3);
+            }
 
             if self.bar_values[i] > 1. {
                 overshoot = true;
@@ -159,18 +158,4 @@ fn inv_mel(x: f32) -> f32 {
     debug_assert!(x <= max_mel_value);
 
     700. * (10f32.powf(x / 2595.) - 1.)
-}
-
-fn ease_in(x: f32) -> f32 {
-    debug_assert!(0. <= x, "x: {}", x);
-    debug_assert!(x <= 1., "x: {}", x);
-
-    x.powf(5.)
-}
-
-fn ease_out(x: f32) -> f32 {
-    debug_assert!(0. <= x, "x: {}", x);
-    debug_assert!(x <= 1., "x: {}", x);
-
-    1. - (1. - x).powf(5.)
 }
