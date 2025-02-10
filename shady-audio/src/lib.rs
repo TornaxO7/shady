@@ -51,7 +51,6 @@ mod equalizer;
 mod fft;
 // mod magnitude;
 // mod ring_buffer;
-mod timer;
 
 type Hz = u32;
 pub const MIN_HUMAN_FREQUENCY: Hz = 20;
@@ -87,7 +86,6 @@ pub struct ShadyAudio {
     fetcher: Box<dyn Fetcher>,
     fft: FftCalculator,
     equalizer: Equalizer,
-    // timer: Timer,
 }
 
 impl ShadyAudio {

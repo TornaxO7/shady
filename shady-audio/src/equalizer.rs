@@ -1,11 +1,11 @@
 use core::f32;
-use std::{ops::Range, time::Duration};
+use std::ops::Range;
 
 use cpal::SampleRate;
 use realfft::num_complex::Complex32;
-use tracing::{debug, instrument};
+use tracing::instrument;
 
-use crate::{timer::Timer, Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
+use crate::{Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
 
 #[derive(Debug)]
 pub struct Equalizer {
@@ -108,7 +108,8 @@ impl Equalizer {
             if is_silent {
                 self.bar_values[i] *= 0.75;
             } else {
-                self.bar_values[i] += (next_magnitude - prev_magnitude) * rel_change.min(0.3);
+                self.bar_values[i] +=
+                    (next_magnitude - prev_magnitude) * (rel_change.min(0.3).max(0.1));
             }
 
             if self.bar_values[i] > 1. {
