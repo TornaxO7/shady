@@ -3,53 +3,85 @@ use std::{fs::File, num::NonZeroUsize, time::Duration};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
-    style::Color,
+    style::{Color, Style},
     widgets::{Bar, BarChart, BarGroup},
     Frame,
 };
 use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+const HEIGHT: u64 = 1000;
+
 #[derive(clap::Parser, Debug)]
 #[command(version, about)]
-struct Ctx {
-    /// The bar width
-    #[arg(short, long, default_value_t = 3)]
-    bar_width: u16,
-
+struct Cli {
     /// The bar color. For a full list of possible colors: https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html
     #[arg(short, long, default_value_t = Color::LightBlue)]
     color: Color,
 }
 
-impl Ctx {
+struct Ctx<'a> {
+    bar_width: u16,
+    bars: Vec<Bar<'a>>,
+    color: Color,
+
+    audio: ShadyAudio,
+}
+
+impl<'a> Ctx<'a> {
     fn amount_bars(&self, columns: u16) -> NonZeroUsize {
         NonZeroUsize::new((columns / self.bar_width) as usize).unwrap()
+    }
+
+    fn set_bars(&mut self, columns: u16) {
+        let amount_bars = self.amount_bars(columns);
+
+        self.bars.resize(
+            usize::from(amount_bars),
+            Bar::default().text_value("".to_string()),
+        );
+
+        self.audio.set_bars(amount_bars);
+    }
+
+    fn get_bars(&mut self) -> &[Bar<'a>] {
+        let bar_values = self.audio.get_bars();
+
+        for (value, bar) in bar_values.iter().zip(self.bars.iter_mut()) {
+            *bar = bar.clone().value((HEIGHT as f32 * value) as u64);
+        }
+
+        self.bars.as_slice()
     }
 }
 
 fn main() -> std::io::Result<()> {
     init_logger();
 
-    let mut ctx = Ctx::parse();
+    let cli = Cli::parse();
+    let mut ctx = Ctx {
+        bar_width: 3,
+        bars: Vec::new(),
+        color: cli.color,
+        audio: ShadyAudio::new(
+            SystemAudioFetcher::default(|err| panic!("{}", err)),
+            ShadyAudioConfig::default(),
+        )
+        .unwrap(),
+    };
 
     let mut terminal = ratatui::init();
-    let mut audio = ShadyAudio::new(
-        SystemAudioFetcher::default(|err| panic!("{}", err)),
-        ShadyAudioConfig::default(),
-    )
-    .unwrap();
 
     let mut prev_columns = 0;
     loop {
         let window_size = crossterm::terminal::window_size()?;
         if prev_columns != window_size.columns {
             prev_columns = window_size.columns;
-            audio.set_bars(ctx.amount_bars(window_size.columns));
+            ctx.set_bars(window_size.columns);
         }
 
         terminal
-            .draw(|frame| draw(frame, &mut audio, &ctx))
+            .draw(|frame| draw(frame, &mut ctx))
             .expect("Render frame");
 
         if event::poll(Duration::from_millis(1000 / 60))? {
@@ -58,11 +90,11 @@ fn main() -> std::io::Result<()> {
                     KeyCode::Char('q') => break,
                     KeyCode::Char('+') => {
                         ctx.bar_width += 1;
-                        audio.set_bars(ctx.amount_bars(window_size.columns));
+                        ctx.set_bars(window_size.columns);
                     }
                     KeyCode::Char('-') => {
                         ctx.bar_width = 1.max(ctx.bar_width - 1);
-                        audio.set_bars(ctx.amount_bars(window_size.columns));
+                        ctx.set_bars(window_size.columns);
                     }
                     _ => {}
                 }
@@ -74,23 +106,12 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn draw(frame: &mut Frame, audio: &mut ShadyAudio, ctx: &Ctx) {
-    const HEIGHT: u64 = 1000;
-
-    let bar_values = audio.get_bars();
-    let bars = bar_values
-        .iter()
-        .map(|&value| {
-            Bar::default()
-                .value((HEIGHT as f32 * value) as u64)
-                .text_value("".to_string())
-        })
-        .collect::<Vec<Bar>>();
-
+fn draw(frame: &mut Frame, ctx: &mut Ctx) {
     let bar_chart = BarChart::default()
         .bar_width(ctx.bar_width)
         .bar_gap(1)
-        .data(BarGroup::default().label("".into()).bars(&bars))
+        .bar_style(Style::new().fg(ctx.color))
+        .data(BarGroup::default().label("".into()).bars(ctx.get_bars()))
         .max(HEIGHT);
 
     frame.render_widget(&bar_chart, frame.area());
