@@ -10,7 +10,6 @@ documentation = "https://docs.rs/shady-audio"
 repository = "https://github.com/TornaxO7/shady/tree/main/shady-audio"
 
 [dependencies]
-splines.workspace = true
 cpal.workspace = true
 realfft.workspace = true
 tracing.workspace = true

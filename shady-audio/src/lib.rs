@@ -45,18 +45,13 @@
 pub mod config;
 pub mod fetcher;
 
-// mod audio_spline;
-// mod engine;
 mod equalizer;
 mod fft;
-// mod magnitude;
-// mod ring_buffer;
 
 type Hz = u32;
 pub const MIN_HUMAN_FREQUENCY: Hz = 20;
 pub const MAX_HUMAN_FREQUENCY: Hz = 20_000;
 
-// pub use audio_spline::FreqSpline;
 pub use cpal;
 
 use config::{ConfigError, ShadyAudioConfig};
@@ -66,16 +61,11 @@ use fetcher::Fetcher;
 use fft::FftCalculator;
 use std::{num::NonZeroUsize, ops::Range};
 
-// The starting frequency from where the spline will collect/create its points.
-// const START_FREQ: Hz = 20;
-// The ending frequency from where the spline will stop collecting/create its points.
-// const END_FREQ: Hz = 15_000
-
 struct State {
-    pub amount_bars: usize,
-    pub sample_rate: SampleRate,
-    pub freq_range: Range<Hz>,
-    pub sensitivity: f32,
+    amount_bars: usize,
+    sample_rate: SampleRate,
+    freq_range: Range<Hz>,
+    sensitivity: f32,
 }
 
 /// The main struct to interact with the crate.
@@ -129,27 +119,7 @@ impl ShadyAudio {
         })
     }
 
-    /// Returns you the latest "frequency spline" which describes the presence of each frequency.
-    /// The spline basically represents the curve of audio visualizers which are using a bar chart
-    /// like [`shady-cli`](https://github.com/TornaxO7/shady/tree/main/shady-cli).
-    // pub fn get_spline(&mut self) -> &FreqSpline {
-    //     let magnitudes = match self.timer.ease_time() {
-    //         Some(ease_time) => self.magnitudes.update_with_ease(ease_time),
-    //         None => {
-    //             let data_buf = self.fft_input.as_mut_slice();
-
-    //             self.fetcher.fetch_snapshot(data_buf);
-    //             let fft_out = self.fft.process(data_buf);
-    //             self.magnitudes.update_magnitudes(fft_out)
-    //         }
-    //     };
-    //     self.spline.update(magnitudes);
-
-    //     &self.spline
-    // }
-
     pub fn get_bars(&mut self) -> &[f32] {
-        // TODO: Fetcher fetcht zu große blöcke, aber dafür in kleineren zeitslots
         self.fetcher.fetch_samples(&mut self.sample_buffer);
         let fft_out = self.fft.process(&self.sample_buffer);
         let bars = self.equalizer.process(fft_out);
@@ -172,9 +142,4 @@ impl ShadyAudio {
             Some(self.state.sensitivity),
         );
     }
-
-    // /// Let's you update the internal config if you'd like to change something.
-    // pub fn update_config(&mut self, config: ShadyAudioConfig) {
-    //     self.timer.set_refresh_time(config.refresh_time);
-    // }
 }
