@@ -10,7 +10,7 @@ license = "GPL-3.0-or-later"
 anyhow = "1"
 ariadne = "0.5"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-notify = "7"
+notify = "8"
 shady = { path = "../shady-lib" }
 
 winit.workspace = true
