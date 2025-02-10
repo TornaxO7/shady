@@ -35,10 +35,6 @@ You just need `alsa-lib` and [rust], then navigate into this directory and execu
 cargo run --release -- <shady-cli args>
 ```
 
-#### Example
-
-- `cargo run --release -- --bar-width 3` start `shady-cli` with an initial bar width of `3`
-
 # Other notes
 
 `shady-cli` is not as mature as [cava]. If you want a solid experience, then [cava] is the way to go.
