@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, num::NonZeroUsize};
 
 use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
 use wgpu::Device;
@@ -22,12 +22,9 @@ pub struct Audio {
 
 impl Audio {
     pub fn fetch_audio(&mut self) {
-        let spline = self.shady_audio.get_spline();
+        let bars = self.shady_audio.get_bars();
 
-        for i in 0..AUDIO_BUFFER_SIZE {
-            let x = i as f32 / (AUDIO_BUFFER_SIZE + 1) as f32;
-            self.audio_buffer[i] = spline.sample(x).unwrap_or(0.);
-        }
+        self.audio_buffer.copy_from_slice(bars);
     }
 }
 
@@ -39,8 +36,12 @@ impl Resource for Audio {
 
         let shady_audio = ShadyAudio::new(
             SystemAudioFetcher::default(|err| panic!("{}", err)),
-            ShadyAudioConfig::default(),
-        );
+            ShadyAudioConfig {
+                amount_bars: NonZeroUsize::new(AUDIO_BUFFER_SIZE).unwrap(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
         let audio_buffer = Box::new([0.; AUDIO_BUFFER_SIZE]);
 
@@ -68,8 +69,8 @@ impl Resource for Audio {
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
-        let data = &self.audio_buffer;
-        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(data.as_slice()));
+        let bars = &self.audio_buffer;
+        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(bars.as_slice()));
     }
 }
 

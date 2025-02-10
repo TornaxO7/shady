@@ -13,5 +13,9 @@ impl DummyFetcher {
 
 impl Fetcher for DummyFetcher {
     /// Writes *nothing* into the given buffer.
-    fn fetch_snapshot(&mut self, _buf: &mut [f32]) {}
+    fn fetch_samples(&mut self, _buf: &mut Vec<f32>) {}
+
+    fn sample_rate(&self) -> cpal::SampleRate {
+        cpal::SampleRate(44_100)
+    }
 }
