@@ -81,8 +81,8 @@ fn draw(frame: &mut Frame, audio: &mut ShadyAudio, ctx: &Ctx) {
             let mut x = 0f64;
             for &bar_value in bar_values {
                 r_ctx.draw(&FilledRectangle {
-                    x: (x + gap_width) as f64,
-                    width: (slot_width / 2.) as f64,
+                    x: x + gap_width,
+                    width: slot_width / 2.,
                     height: bar_value as f64,
                     color: Color::Blue,
                 });

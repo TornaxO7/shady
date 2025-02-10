@@ -62,7 +62,9 @@ impl Equalizer {
                     start = end;
                 }
                 // let the last bar use every resulting bar
-                cut_offs.last_mut().map(|range| range.end = amount_bins);
+                if let Some(range) = cut_offs.last_mut() {
+                    range.end = amount_bins;
+                }
 
                 cut_offs
             };
@@ -109,7 +111,7 @@ impl Equalizer {
                 self.bar_values[i] *= 0.75;
             } else {
                 self.bar_values[i] +=
-                    (next_magnitude - prev_magnitude) * (rel_change.min(0.2).max(0.05));
+                    (next_magnitude - prev_magnitude) * rel_change.clamp(0.05, 0.2);
             }
 
             if self.bar_values[i] > 1. {
