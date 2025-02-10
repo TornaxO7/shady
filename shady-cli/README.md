@@ -5,7 +5,7 @@ of [shady-audio].
 
 # Demo
 
-[![Demo video](https://img.youtube.com/vi/FnB8QZckJlM/maxresdefault.jpg)](https://www.youtube.com/watch?v=FnB8QZckJlM)
+[![Demo video](https://img.youtube.com/vi/jgpsCPTljIQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=jgpsCPTljIQ)
 
 # Usage
 
