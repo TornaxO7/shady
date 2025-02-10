@@ -13,9 +13,28 @@ use std::{
 /// [ShadyAudioConfig.refresh_time]: struct.ShadyAudioConfig.html#structfield.refresh_time
 pub const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
 
+/// Contains all invalid configurations of [`ShadyAudioConfig`].
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum ConfigError {
-    #[error("Frequency rang can't be empty but you gave: {0:?}")]
+    /// Occurs, if you've set [`ShadyAudioConfig::freq_range`] to an empty range.
+    ///
+    /// # Example
+    /// ```rust
+    /// use shady_audio::config::{ShadyAudioConfig, ConfigError};
+    /// use std::num::NonZeroU32;
+    ///
+    /// let invalid_range = NonZeroU32::new(10).unwrap()..NonZeroU32::new(10).unwrap();
+    /// assert!(invalid_range.is_empty(), "`start` and `end` are equal");
+    ///
+    /// let config = ShadyAudioConfig {
+    ///     freq_range: invalid_range.clone(),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// // the range isn't allowed to be empty!
+    /// assert!(config.validate().is_err());
+    /// ```
+    #[error("Frequency range can't be empty but you gave: {0:?}")]
     EmptyFreqRange(Range<NonZeroU32>),
 }
 
@@ -28,17 +47,6 @@ pub enum ConfigError {
 /// use std::time::Duration;
 ///
 /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
-///
-/// // ... do some wild stuff ...
-///
-/// // maybe... we would like to change something :>
-/// // Let it fetch the latest data faster.
-/// let new_config = ShadyAudioConfig {
-///     refresh_time: Duration::from_millis(50),
-///     .. Default::default()
-/// };
-///
-/// shady_audio.update_config(new_config);
 /// ```
 ///
 /// [ShadyAudio]: crate::ShadyAudio
@@ -54,12 +62,29 @@ pub struct ShadyAudioConfig {
     /// See [DEFAULT_REFRESH_TIME
     pub refresh_time: Duration,
 
+    /// Set the amount bars which should be used.
     pub amount_bars: NonZeroUsize,
 
+    /// Set the frequency range of which `shady-audio` should listen to for the bars.
+    ///
+    /// # Example
+    /// ```rust
+    /// use shady_audio::config::ShadyAudioConfig;
+    /// use std::num::NonZeroU32;
+    ///
+    /// let config = ShadyAudioConfig {
+    ///     // `shady_audio` should only listen to the frequencies starting from 10Hz up to 15_000Hz.
+    ///     freq_range: NonZeroU32::new(100).unwrap()..NonZeroU32::new(15_000).unwrap(),
+    ///     ..Default::default()
+    /// };
+    /// ```
     pub freq_range: Range<NonZeroU32>,
 }
 
 impl ShadyAudioConfig {
+    /// Checks if the current config is valid or contains any mistakes.
+    ///
+    /// See [`ConfigError`] to see all possible errors.
     pub fn validate(&self) -> Result<(), Vec<ConfigError>> {
         let mut errors = Vec::new();
 

@@ -8,39 +8,37 @@
 //! to your dependency list.
 //!
 //! # How to get started
-//! You mainly interact with [ShadyAudio] and start there by clicking on the link.
+//! You mainly interact with [ShadyAudio].
 //!
 //! # Example
-//! This example basically contains the full API:
-//!
 //! ```rust
 //! use std::num::NonZeroUsize;
 //!
 //! use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
 //!
 //! let mut audio = {
+//!     // A fetcher feeds new samples to `ShadyAudio` which processes it
 //!     let fetcher = DummyFetcher::new();
-//!     let config = ShadyAudioConfig::default();
 //!
-//!     ShadyAudio::new(fetcher, config)
+//!     // configure the behaviour of `ShadyAudio`
+//!     let config = ShadyAudioConfig {
+//!         amount_bars: NonZeroUsize::new(10).unwrap(),
+//!         ..Default::default()
+//!     };
+//!
+//!     ShadyAudio::new(fetcher, config).unwrap()
 //! };
 //!
-//! // Retrieve a spline which you can use, to get any points from the frequancy bands of your audio fetcher.
-//! // `shady-audio` will take care of the rest. Let it be
-//! //   - gravity effect
-//! //   - smooth transition
+//! // just retrieve the bars.
+//! // ShadyAudio takes care of the rest:
+//! //   - fetching new samples from the fetcher
+//! //   - normalize the values within the range [0, 1]
 //! //   - etc.
-//! let spline = audio.get_spline();
+//! assert_eq!(audio.get_bars().len(), 10);
 //!
-//! // All relevant points of the spline are stored within the range [0, 1].
-//! // Since we're currently using the [DummyFetcher] our spline equals the function `f(x) = 0`:
-//! assert_eq!(spline.sample(0.0), Some(0.0));
-//! assert_eq!(spline.sample(0.5), Some(0.0));
-//! // actually for some reason, `splines::Spline` returns `None` here and I don't know why ._.
-//! assert_eq!(spline.sample(1.0), None);
-//!
-//! // Any other value inside [0, 1] is fine:
-//! assert_eq!(spline.sample(0.123456789), Some(0.0));
+//! // change the amount of bars you'd like to have
+//! audio.set_bars(NonZeroUsize::new(20).unwrap());
+//! assert_eq!(audio.get_bars().len(), 20);
 //! ```
 pub mod config;
 pub mod fetcher;
@@ -49,7 +47,13 @@ mod equalizer;
 mod fft;
 
 type Hz = u32;
+
+/// The minimal frequency which humans can here (roughly)
+/// See: https://en.wikipedia.org/wiki/Hearing_range
 pub const MIN_HUMAN_FREQUENCY: Hz = 20;
+
+/// The maximal frequency which humans can here (roughly)
+/// See: https://en.wikipedia.org/wiki/Hearing_range
 pub const MAX_HUMAN_FREQUENCY: Hz = 20_000;
 
 pub use cpal;
@@ -119,6 +123,9 @@ impl ShadyAudio {
         })
     }
 
+    /// Return the bars with their values.
+    ///
+    /// Each bar value tries to stay within the range `[0, 1]` but it could happen that there are some spikes.
     pub fn get_bars(&mut self) -> &[f32] {
         self.fetcher.fetch_samples(&mut self.sample_buffer);
         let fft_out = self.fft.process(&self.sample_buffer);
@@ -129,6 +136,7 @@ impl ShadyAudio {
         bars
     }
 
+    /// Set the length of the returned slice of [`Self::get_bars`].
     pub fn set_bars(&mut self, amount_bars: NonZeroUsize) {
         self.state.amount_bars = usize::from(amount_bars);
 
