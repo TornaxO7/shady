@@ -83,7 +83,6 @@ impl Equalizer {
         for (i, range) in self.bar_ranges.iter().cloned().enumerate() {
             let prev_magnitude = self.bar_values[i];
             let next_magnitude: f32 = {
-                let range_len = range.len();
                 let raw_bar_val = fft_out[range]
                     .iter()
                     .map(|out| {
@@ -93,10 +92,8 @@ impl Equalizer {
                         }
                         mag
                     })
-                    .sum::<f32>()
-                    / range_len as f32;
-                // .max_by(|a, b| a.total_cmp(b))
-                // .unwrap();
+                    .max_by(|a, b| a.total_cmp(b))
+                    .unwrap();
 
                 self.sensitivity * raw_bar_val
             };
@@ -105,28 +102,6 @@ impl Equalizer {
             debug_assert!(!next_magnitude.is_nan());
 
             self.bar_values[i] = next_magnitude;
-
-            // if is_silent {
-            //     self.bar_values[i] = prev_magnitude * 0.9;
-            // } else {
-            //     let relative_change = if prev_magnitude > 0. {
-            //         next_magnitude / prev_magnitude
-            //     } else {
-            //         1.
-            //     };
-
-            //     let factor = if relative_change >= 2. {
-            //         0.8
-            //     } else if 0.9 <= relative_change && relative_change <= 1.1 {
-            //         0.1
-            //     } else if relative_change >= 0.1 {
-            //         relative_change
-            //     } else {
-            //         0.1
-            //     };
-
-            //     self.bar_values[i] = factor * next_magnitude + (1. - factor) * prev_magnitude;
-            // }
 
             if self.bar_values[i] > 1. {
                 overshoot = true;

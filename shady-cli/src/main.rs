@@ -1,9 +1,5 @@
 use clap::Parser;
-use std::{
-    fs::File,
-    num::{NonZeroU32, NonZeroUsize},
-    time::Duration,
-};
+use std::{fs::File, num::NonZeroUsize, time::Duration};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
