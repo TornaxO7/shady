@@ -3,43 +3,85 @@ use std::{fs::File, num::NonZeroUsize, time::Duration};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
-    style::Color,
-    widgets::canvas::{Canvas, Line, Shape},
+    style::{Color, Style},
+    widgets::{Bar, BarChart, BarGroup},
     Frame,
 };
 use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+const HEIGHT: u64 = 1000;
+
 #[derive(clap::Parser, Debug)]
 #[command(version, about)]
-struct Ctx {
-    /// The bar width
-    #[arg(short, long, default_value_t = 16)]
-    amount_bars: usize,
-
+struct Cli {
     /// The bar color. For a full list of possible colors: https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html
     #[arg(short, long, default_value_t = Color::LightBlue)]
     color: Color,
 }
 
+struct Ctx<'a> {
+    bar_width: u16,
+    bars: Vec<Bar<'a>>,
+    color: Color,
+
+    audio: ShadyAudio,
+}
+
+impl<'a> Ctx<'a> {
+    fn amount_bars(&self, columns: u16) -> NonZeroUsize {
+        NonZeroUsize::new((columns / self.bar_width) as usize).unwrap()
+    }
+
+    fn set_bars(&mut self, columns: u16) {
+        let amount_bars = self.amount_bars(columns);
+
+        self.bars.resize(
+            usize::from(amount_bars),
+            Bar::default().text_value("".to_string()),
+        );
+
+        self.audio.set_bars(amount_bars);
+    }
+
+    fn get_bars(&mut self) -> &[Bar<'a>] {
+        let bar_values = self.audio.get_bars();
+
+        for (value, bar) in bar_values.iter().zip(self.bars.iter_mut()) {
+            *bar = bar.clone().value((HEIGHT as f32 * value) as u64);
+        }
+
+        self.bars.as_slice()
+    }
+}
+
 fn main() -> std::io::Result<()> {
     init_logger();
 
-    let mut ctx = Ctx::parse();
+    let cli = Cli::parse();
+    let mut ctx = Ctx {
+        bar_width: 3,
+        bars: Vec::new(),
+        color: cli.color,
+        audio: ShadyAudio::new(
+            SystemAudioFetcher::default(|err| panic!("{}", err)),
+            ShadyAudioConfig::default(),
+        )
+        .unwrap(),
+    };
 
     let mut terminal = ratatui::init();
-    let mut audio = ShadyAudio::new(
-        SystemAudioFetcher::default(|err| panic!("{}", err)),
-        ShadyAudioConfig {
-            amount_bars: NonZeroUsize::new(ctx.amount_bars).unwrap(),
-            ..Default::default()
-        },
-    )
-    .unwrap();
 
+    let mut prev_columns = 0;
     loop {
+        let window_size = crossterm::terminal::window_size()?;
+        if prev_columns != window_size.columns {
+            prev_columns = window_size.columns;
+            ctx.set_bars(window_size.columns);
+        }
+
         terminal
-            .draw(|frame| draw(frame, &mut audio, &ctx))
+            .draw(|frame| draw(frame, &mut ctx))
             .expect("Render frame");
 
         if event::poll(Duration::from_millis(1000 / 60))? {
@@ -47,12 +89,12 @@ fn main() -> std::io::Result<()> {
                 match code {
                     KeyCode::Char('q') => break,
                     KeyCode::Char('+') => {
-                        ctx.amount_bars += 1;
-                        audio.set_bars(NonZeroUsize::new(ctx.amount_bars).unwrap());
+                        ctx.bar_width += 1;
+                        ctx.set_bars(window_size.columns);
                     }
                     KeyCode::Char('-') => {
-                        ctx.amount_bars = ctx.amount_bars.saturating_sub(1).max(1);
-                        audio.set_bars(NonZeroUsize::new(ctx.amount_bars).unwrap());
+                        ctx.bar_width = 1.max(ctx.bar_width - 1);
+                        ctx.set_bars(window_size.columns);
                     }
                     _ => {}
                 }
@@ -64,34 +106,15 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn draw(frame: &mut Frame, audio: &mut ShadyAudio, ctx: &Ctx) {
-    const HEIGHT: f64 = 1.;
-    const WIDTH: f64 = 1.;
+fn draw(frame: &mut Frame, ctx: &mut Ctx) {
+    let bar_chart = BarChart::default()
+        .bar_width(ctx.bar_width)
+        .bar_gap(1)
+        .bar_style(Style::new().fg(ctx.color))
+        .data(BarGroup::default().label("".into()).bars(ctx.get_bars()))
+        .max(HEIGHT);
 
-    let bar_values = audio.get_bars();
-
-    let canvas = Canvas::default()
-        .x_bounds([0., WIDTH])
-        .y_bounds([0., HEIGHT])
-        .marker(ratatui::symbols::Marker::HalfBlock)
-        .paint(|r_ctx| {
-            let slot_width = WIDTH / ctx.amount_bars as f64;
-            let gap_width = slot_width / 4.;
-
-            let mut x = 0f64;
-            for &bar_value in bar_values {
-                r_ctx.draw(&FilledRectangle {
-                    x: x + gap_width,
-                    width: slot_width / 2.,
-                    height: bar_value as f64,
-                    color: Color::Blue,
-                });
-
-                x += slot_width;
-            }
-        });
-
-    frame.render_widget(&canvas, frame.area());
+    frame.render_widget(&bar_chart, frame.area());
 }
 
 fn init_logger() {
@@ -106,30 +129,4 @@ fn init_logger() {
         .with(fmt_layer)
         .with(EnvFilter::from_env(EnvFilter::DEFAULT_ENV))
         .init();
-}
-
-struct FilledRectangle {
-    x: f64,
-    width: f64,
-    height: f64,
-    color: Color,
-}
-
-impl Shape for FilledRectangle {
-    fn draw(&self, painter: &mut ratatui::widgets::canvas::Painter) {
-        let mut y = 0.;
-
-        while y < self.height {
-            Line {
-                x1: self.x,
-                x2: self.x + self.width,
-                y1: y,
-                y2: y,
-                color: self.color,
-            }
-            .draw(painter);
-
-            y += 0.001;
-        }
-    }
 }
