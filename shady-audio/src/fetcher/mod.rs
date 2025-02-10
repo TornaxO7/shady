@@ -9,8 +9,9 @@ pub use system_audio::SystemAudio as SystemAudioFetcher;
 
 /// Interface for all structs (fetchers) which are listed in the [fetcher module](crate::fetcher).
 pub trait Fetcher {
-    /// **Replaces** the content of `buf` with the data from the given fetcher.
+    /// **Appends** new samples to the given `buf`.
     fn fetch_samples(&mut self, buf: &mut Vec<f32>);
 
+    /// Returns the sample rate of the fetcher/audio source.
     fn sample_rate(&self) -> SampleRate;
 }

@@ -59,8 +59,8 @@ impl SystemAudio {
     /// # Note
     ///
     /// Currently only devices and configs are supported which:
-    ///     - are able to have the sample rate set by [DEFAULT_SAMPLE_RATE].
-    ///     - *and* have exactlly *one* channel
+    ///  - have **one** channel
+    ///  - the sample format is `f32`
     ///
     /// It's ***strongly recommended*** to use [SystemAudio::default] instead to reduce the headache.
     pub fn new<E>(
