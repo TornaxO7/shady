@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use cpal::SampleRate;
 use realfft::num_complex::Complex32;
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 use crate::{Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
 
@@ -24,14 +24,18 @@ impl Equalizer {
         sample_rate: SampleRate,
         sensitivity: Option<f32>,
     ) -> Self {
+        assert!(sample_rate.0 > 0);
+
         let bar_values = vec![0.; amount_bars].into_boxed_slice();
 
         let bar_ranges = {
             let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
+            debug!("Freq resolution: {}", freq_resolution);
 
             let weights = (0..amount_bars)
                 .map(|index| exp_fun(index as f32 / amount_bars as f32))
                 .collect::<Vec<f32>>();
+            debug!("Weights: {:?}", weights);
 
             // the relevant index range of the fft output which we should use for the bars
             let bin_range = Range {
@@ -39,8 +43,10 @@ impl Equalizer {
                 end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
             };
             let amount_bins = bin_range.len();
+            debug!("Bin range: {:?}", bin_range);
+            debug!("Available bins: {}", amount_bins);
 
-            debug_assert!(
+            assert!(
                 amount_bins >= amount_bars,
                 "Not enough bins available (available: {}) for {} bars",
                 amount_bins,
@@ -68,7 +74,7 @@ impl Equalizer {
 
                 cut_offs
             };
-            tracing::debug!("Ranges: {:?}", ranges);
+            tracing::debug!("Bin ranges: {:?}", ranges);
 
             ranges.into_boxed_slice()
         };
