@@ -11,6 +11,7 @@ use crate::{Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
 pub struct Equalizer {
     bar_values: Box<[f32]>,
     bar_ranges: Box<[Range<usize>]>,
+    started_falling: Box<[bool]>,
 
     sensitivity: f32,
 }
@@ -27,6 +28,7 @@ impl Equalizer {
         assert!(sample_rate.0 > 0);
 
         let bar_values = vec![0.; amount_bars].into_boxed_slice();
+        let started_falling = vec![false; amount_bars].into_boxed_slice();
 
         let bar_ranges = {
             let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
@@ -83,6 +85,7 @@ impl Equalizer {
         Self {
             bar_values,
             bar_ranges,
+            started_falling,
             sensitivity: sensitivity.unwrap_or(1.),
         }
     }
@@ -117,9 +120,17 @@ impl Equalizer {
             let rel_change = next_magnitude / prev_magnitude;
             if is_silent {
                 self.bar_values[i] *= 0.75;
+                self.started_falling[i] = false;
             } else {
-                self.bar_values[i] +=
-                    (next_magnitude - prev_magnitude) * rel_change.clamp(0.05, 0.2);
+                let was_already_falling = self.started_falling[i];
+                if next_magnitude < prev_magnitude && !was_already_falling {
+                    self.started_falling[i] = true;
+                    self.bar_values[i] += (next_magnitude - prev_magnitude) * 0.1;
+                } else {
+                    self.started_falling[i] = false;
+                    self.bar_values[i] +=
+                        (next_magnitude - prev_magnitude) * rel_change.clamp(0.05, 0.2);
+                }
             }
 
             if self.bar_values[i] > 1. {
