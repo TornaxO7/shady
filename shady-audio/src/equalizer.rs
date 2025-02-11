@@ -68,9 +68,10 @@ impl Equalizer {
                     start = end;
                 }
                 // let the last bar use every resulting bar
-                if let Some(range) = cut_offs.last_mut() {
-                    range.end = amount_bins;
-                }
+                let last_range = cut_offs
+                    .last_mut()
+                    .expect("There's at least one range/bar.");
+                last_range.end = amount_bins;
 
                 cut_offs
             };
@@ -89,6 +90,7 @@ impl Equalizer {
     pub fn process(&mut self, fft_out: &[Complex32]) -> &[f32] {
         let mut overshoot = false;
         let mut is_silent = true;
+
         for (i, range) in self.bar_ranges.iter().cloned().enumerate() {
             let prev_magnitude = self.bar_values[i];
             let next_magnitude: f32 = {
