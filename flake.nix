@@ -60,7 +60,7 @@
               in
               pkgs.mkShell rec {
                 packages = [ rust-toolchain inputs.cargo-watchdoc.packages.${system}.default ]
-                  ++ (with pkgs; [ cargo-flamegraph cargo-release ]);
+                  ++ (with pkgs; [ cargo-flamegraph cargo-release cargo-dist ]);
                 buildInputs = dependencies;
 
                 shellHook = ''
