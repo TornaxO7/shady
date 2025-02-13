@@ -35,9 +35,13 @@ You just need `alsa-lib` and [rust], then navigate into this directory and execu
 cargo run --release -- <shady-cli args>
 ```
 
-# Other notes
+See
 
-`shady-cli` is not as mature as [cava]. If you want a solid experience, then [cava] is the way to go.
+```
+cargo run --release -- help
+```
+
+to get the help page.
 
 [cava]: https://github.com/karlstav/cava
 [shady-audio]: https://github.com/TornaxO7/shady/tree/main/shady-audio
