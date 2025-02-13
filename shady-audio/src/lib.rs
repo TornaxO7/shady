@@ -44,6 +44,7 @@ pub mod config;
 pub mod fetcher;
 
 mod equalizer;
+mod error;
 mod fft;
 
 type Hz = u32;

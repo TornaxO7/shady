@@ -64,7 +64,7 @@ fn main() -> std::io::Result<()> {
         bars: Vec::new(),
         color: cli.color,
         audio: ShadyAudio::new(
-            SystemAudioFetcher::default(|err| panic!("{}", err)),
+            SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
             ShadyAudioConfig::default(),
         )
         .unwrap(),

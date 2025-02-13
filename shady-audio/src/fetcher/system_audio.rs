@@ -4,6 +4,7 @@ use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleFormat, SampleRate, StreamError, SupportedStreamConfigRange,
 };
+use tracing::{debug, instrument};
 
 use super::Fetcher;
 
@@ -11,10 +12,11 @@ struct SampleBuffer {
     buffer: Box<[f32]>,
     length: usize,
     capacity: usize,
+    channels: u16,
 }
 
 impl SampleBuffer {
-    pub fn new(sample_rate: SampleRate) -> Self {
+    pub fn new(sample_rate: SampleRate, channels: u16) -> Self {
         let capacity = (sample_rate.0 * 10) as usize;
         let buffer = vec![0.; capacity].into_boxed_slice();
 
@@ -22,24 +24,40 @@ impl SampleBuffer {
             buffer,
             capacity,
             length: 0,
+            channels,
         }
     }
 
     pub fn push_before(&mut self, data: &[f32]) {
-        let new_len = std::cmp::min(self.capacity, self.length + data.len());
+        let data_len = data.len() / self.channels as usize;
+        let new_len = std::cmp::min(self.capacity, self.length + data_len);
 
         // move the current values to the right
         self.buffer
             .copy_within(..self.length, new_len - self.length);
-        // copy the new data to the beginning
-        self.buffer[..data.len()].copy_from_slice(data);
 
-        self.length += data.len();
+        for (i, values) in data.chunks_exact(self.channels as usize).enumerate() {
+            self.buffer[i] = values.iter().sum::<f32>() / self.channels as f32;
+        }
+
+        self.length += data_len;
     }
 
     pub fn clear(&mut self) {
         self.length = 0;
     }
+}
+
+#[derive(thiserror::Error, Debug, Clone, Copy)]
+pub enum SystemAudioError {
+    #[error("Couldn't retrieve default output dev")]
+    NoDefaultDevice,
+
+    #[error("Expected sample format F32 but got {0} instead.")]
+    InvalidSampleFormat(SampleFormat),
+
+    #[error("Couldn't retrieve default config of the output stream of the default device.")]
+    NoDefaultOutputStreamConfig,
 }
 
 /// Fetcher for the system audio.
@@ -57,43 +75,29 @@ impl SystemAudio {
     /// if you want.
     ///
     /// # Note
-    ///
-    /// Currently only devices and configs are supported which:
-    ///  - have **one** channel
-    ///  - the sample format is `f32`
-    ///
-    /// It's ***strongly recommended*** to use [SystemAudio::default] instead to reduce the headache.
+    /// It's required that the device supports `f32` as its sample format!
+    #[instrument(name = "SystemAudio::new", skip_all)]
     pub fn new<E>(
-        device: Option<&cpal::Device>,
-        stream_config_range: Option<&SupportedStreamConfigRange>,
+        device: &cpal::Device,
+        stream_config_range: &SupportedStreamConfigRange,
         error_callback: E,
-    ) -> Box<Self>
+    ) -> Result<Box<Self>, SystemAudioError>
     where
         E: FnMut(StreamError) + Send + 'static,
     {
-        let default_device = cpal::default_host()
-            .default_output_device()
-            .expect("Default output device exists");
+        let sample_format = stream_config_range.sample_format();
+        if sample_format != SampleFormat::F32 {
+            return Err(SystemAudioError::InvalidSampleFormat(sample_format));
+        }
 
-        let device = device.unwrap_or(&default_device);
-
-        let stream_config = {
-            let default_output_config = default_output_config(device);
-            let supported_stream_config = stream_config_range.unwrap_or(&default_output_config);
-
-            assert!(
-                supported_stream_config.channels() == 1,
-                "ShadyAudio currently supports only configs with one channel. Your config has set it to {} channels",
-                supported_stream_config.channels()
-            );
-
-            supported_stream_config.with_max_sample_rate().config()
-        };
-
+        let stream_config = stream_config_range.with_max_sample_rate().config();
         let sample_rate = stream_config.sample_rate;
 
+        debug!("Stream config: {:?}", stream_config);
+
         let sample_buffer = {
-            let buffer = SampleBuffer::new(sample_rate);
+            let channels = stream_config.channels;
+            let buffer = SampleBuffer::new(sample_rate, channels);
             Arc::new(Mutex::new(buffer))
         };
 
@@ -117,11 +121,11 @@ impl SystemAudio {
             stream
         };
 
-        Box::new(Self {
+        Ok(Box::new(Self {
             _stream: stream,
             sample_buffer,
             sample_rate,
-        })
+        }))
     }
 
     /// Equals `SystemAudio::new(None, None, error_fallback)`.
@@ -140,11 +144,19 @@ impl SystemAudio {
     ///
     /// let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)), ShadyAudioConfig::default());
     /// ```
-    pub fn default<E>(error_callback: E) -> Box<Self>
+    pub fn default<E>(error_callback: E) -> Result<Box<Self>, SystemAudioError>
     where
         E: FnMut(StreamError) + Send + 'static,
     {
-        Self::new(None, None, error_callback)
+        let Some(default_device) = cpal::default_host().default_output_device() else {
+            return Err(SystemAudioError::NoDefaultDevice);
+        };
+
+        let Some(default_stream_config) = default_output_config(&default_device) else {
+            return Err(SystemAudioError::NoDefaultOutputStreamConfig);
+        };
+
+        Self::new(&default_device, &default_stream_config, error_callback)
     }
 }
 
@@ -170,7 +182,8 @@ impl Fetcher for SystemAudio {
     }
 }
 
-fn default_output_config(device: &cpal::Device) -> SupportedStreamConfigRange {
+#[instrument(skip_all)]
+fn default_output_config(device: &cpal::Device) -> Option<SupportedStreamConfigRange> {
     let mut matching_configs: Vec<_> = device
         .supported_output_configs()
         .expect("Get supported output configs of device")
@@ -178,9 +191,5 @@ fn default_output_config(device: &cpal::Device) -> SupportedStreamConfigRange {
         .collect();
 
     matching_configs.sort_by(|a, b| a.cmp_default_heuristics(b));
-
-    matching_configs
-        .into_iter()
-        .next()
-        .unwrap_or_else(|| panic!("Couldn't find suitable config"))
+    matching_configs.into_iter().next()
 }
