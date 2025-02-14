@@ -42,7 +42,8 @@ fn main() -> std::io::Result<()> {
     let cli = Cli::parse();
     let mut terminal = ratatui::init();
     let mut action = Action::None;
-    let mut model: Box<dyn Model> = DeviceChooser::boxed();
+    let mut model: Box<dyn Model> =
+        DeviceChooser::boxed().map_err(|msg| std::io::Error::other(msg))?;
 
     terminal.clear()?;
 
@@ -70,7 +71,7 @@ fn main() -> std::io::Result<()> {
                 };
             }
             Action::StartDeviceMenu => {
-                model = DeviceChooser::boxed();
+                model = DeviceChooser::boxed().map_err(|msg| std::io::Error::other(msg))?;
                 terminal.clear()?;
                 action = Action::None;
             }

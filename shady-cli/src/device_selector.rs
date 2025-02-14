@@ -22,7 +22,7 @@ pub struct DeviceChooser {
 }
 
 impl DeviceChooser {
-    pub fn boxed() -> Box<Self> {
+    pub fn boxed() -> Result<Box<Self>, &'static str> {
         let host = cpal::default_host();
 
         let output_devices = match host.output_devices() {
@@ -36,12 +36,16 @@ impl DeviceChooser {
             }
         };
 
+        if output_devices.is_empty() {
+            return Err("Couldn't find an audio source for the visualizer :(");
+        }
+
         let output_state = ListState::default();
 
-        Box::new(Self {
+        Ok(Box::new(Self {
             device_names: output_devices,
             list_state: output_state,
-        })
+        }))
     }
 
     fn selected(&self) -> Option<String> {
