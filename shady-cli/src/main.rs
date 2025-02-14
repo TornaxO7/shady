@@ -1,4 +1,7 @@
+mod device_selector;
+
 use clap::Parser;
+use device_selector::DeviceChooser;
 use std::{fs::File, num::NonZeroUsize, time::Duration};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
@@ -20,101 +23,52 @@ struct Cli {
     color: Color,
 }
 
-struct Ctx<'a> {
-    bar_width: u16,
-    bars: Vec<Bar<'a>>,
-    color: Color,
-
-    audio: ShadyAudio,
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Action {
+    StartVisualizer {
+        device_name: String,
+        is_output_device: bool,
+    },
+    Quit,
+    None,
 }
 
-impl<'a> Ctx<'a> {
-    fn amount_bars(&self, columns: u16) -> NonZeroUsize {
-        NonZeroUsize::new((columns / self.bar_width) as usize).unwrap()
-    }
+trait Model {
+    fn draw(&mut self, frame: &mut Frame);
 
-    fn set_bars(&mut self, columns: u16) {
-        let amount_bars = self.amount_bars(columns);
-
-        self.bars.resize(
-            usize::from(amount_bars),
-            Bar::default().text_value("".to_string()),
-        );
-
-        self.audio.set_bars(amount_bars);
-    }
-
-    fn get_bars(&mut self) -> &[Bar<'a>] {
-        let bar_values = self.audio.get_bars();
-
-        for (value, bar) in bar_values.iter().zip(self.bars.iter_mut()) {
-            *bar = bar.clone().value((HEIGHT as f32 * value) as u64);
-        }
-
-        self.bars.as_slice()
-    }
+    fn handle_event(&mut self, event: Event) -> Action;
 }
 
 fn main() -> std::io::Result<()> {
     init_logger();
 
     let cli = Cli::parse();
-    let mut ctx = Ctx {
-        bar_width: 3,
-        bars: Vec::new(),
-        color: cli.color,
-        audio: ShadyAudio::new(
-            SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
-            ShadyAudioConfig::default(),
-        )
-        .unwrap(),
-    };
-
     let mut terminal = ratatui::init();
+    let mut action = Action::None;
+    let mut model = DeviceChooser::boxed();
 
-    let mut prev_columns = 0;
     loop {
-        let window_size = crossterm::terminal::window_size()?;
-        if prev_columns != window_size.columns {
-            prev_columns = window_size.columns;
-            ctx.set_bars(window_size.columns);
-        }
-
-        terminal
-            .draw(|frame| draw(frame, &mut ctx))
-            .expect("Render frame");
+        terminal.draw(|frame| model.draw(frame))?;
 
         if event::poll(Duration::from_millis(1000 / 60))? {
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                match code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Char('+') => {
-                        ctx.bar_width += 1;
-                        ctx.set_bars(window_size.columns);
-                    }
-                    KeyCode::Char('-') => {
-                        ctx.bar_width = 1.max(ctx.bar_width - 1);
-                        ctx.set_bars(window_size.columns);
-                    }
-                    _ => {}
-                }
+            action = model.handle_event(event::read()?);
+        }
+
+        match action.clone() {
+            Action::StartVisualizer {
+                device_name,
+                is_output_device,
+            } => {
+                tracing::error!("{}", device_name);
+                break;
             }
+            Action::Quit => break,
+            Action::None => {}
         }
     }
 
     ratatui::restore();
     Ok(())
-}
-
-fn draw(frame: &mut Frame, ctx: &mut Ctx) {
-    let bar_chart = BarChart::default()
-        .bar_width(ctx.bar_width)
-        .bar_gap(1)
-        .bar_style(Style::new().fg(ctx.color))
-        .data(BarGroup::default().label("".into()).bars(ctx.get_bars()))
-        .max(HEIGHT);
-
-    frame.render_widget(&bar_chart, frame.area());
 }
 
 fn init_logger() {
