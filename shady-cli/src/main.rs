@@ -59,6 +59,7 @@ fn main() -> std::io::Result<()> {
             Action::StartVisualizer { device_name } => {
                 debug!("Selected device: '{}'", device_name);
 
+                terminal.clear()?;
                 match Visualizer::boxed(device_name) {
                     Ok(visualizer) => {
                         model = visualizer;
