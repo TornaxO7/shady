@@ -1,19 +1,18 @@
 mod device_selector;
+mod visualizer;
 
 use clap::Parser;
 use device_selector::DeviceChooser;
-use std::{fs::File, num::NonZeroUsize, time::Duration};
+use std::{fs::File, time::Duration};
+use tracing::debug;
+use visualizer::Visualizer;
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use ratatui::{
-    style::{Color, Style},
-    widgets::{Bar, BarChart, BarGroup},
-    Frame,
+use crossterm::{
+    event::{self, Event},
+    terminal::WindowSize,
 };
-use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
+use ratatui::{style::Color, Frame};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-
-const HEIGHT: u64 = 1000;
 
 #[derive(clap::Parser, Debug)]
 #[command(version, about)]
@@ -29,12 +28,13 @@ enum Action {
         device_name: String,
         is_output_device: bool,
     },
+    StartDeviceMenu,
     Quit,
     None,
 }
 
 trait Model {
-    fn draw(&mut self, frame: &mut Frame);
+    fn draw(&mut self, frame: &mut Frame, window_size: WindowSize);
 
     fn handle_event(&mut self, event: Event) -> Action;
 }
@@ -45,10 +45,11 @@ fn main() -> std::io::Result<()> {
     let cli = Cli::parse();
     let mut terminal = ratatui::init();
     let mut action = Action::None;
-    let mut model = DeviceChooser::boxed();
+    let mut model: Box<dyn Model> = DeviceChooser::boxed();
 
     loop {
-        terminal.draw(|frame| model.draw(frame))?;
+        let window_size = crossterm::terminal::window_size()?;
+        terminal.draw(|frame| model.draw(frame, window_size))?;
 
         if event::poll(Duration::from_millis(1000 / 60))? {
             action = model.handle_event(event::read()?);
@@ -59,8 +60,22 @@ fn main() -> std::io::Result<()> {
                 device_name,
                 is_output_device,
             } => {
-                tracing::error!("{}", device_name);
-                break;
+                debug!(
+                    "Selected device: '{}'. Is output device: {}",
+                    device_name, is_output_device
+                );
+
+                match Visualizer::boxed(device_name, is_output_device) {
+                    Ok(visualizer) => model = visualizer,
+                    Err(err) => {
+                        tracing::error!("Couldn't start visualizer: {}", err);
+                        action = Action::StartDeviceMenu;
+                    }
+                }
+            }
+            Action::StartDeviceMenu => {
+                model = DeviceChooser::boxed();
+                action = Action::StartDeviceMenu;
             }
             Action::Quit => break,
             Action::None => {}

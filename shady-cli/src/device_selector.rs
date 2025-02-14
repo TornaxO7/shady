@@ -1,4 +1,7 @@
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::{
+    event::{Event, KeyCode, KeyEvent},
+    terminal::WindowSize,
+};
 use ratatui::{
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
@@ -138,7 +141,7 @@ impl DeviceChooser {
 }
 
 impl Model for DeviceChooser {
-    fn draw(&mut self, frame: &mut ratatui::Frame) {
+    fn draw(&mut self, frame: &mut ratatui::Frame, _: WindowSize) {
         let column = Layout::horizontal([
             Constraint::Percentage(25),
             Constraint::Percentage(50),
