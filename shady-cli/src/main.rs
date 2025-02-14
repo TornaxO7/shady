@@ -47,6 +47,8 @@ fn main() -> std::io::Result<()> {
     let mut action = Action::None;
     let mut model: Box<dyn Model> = DeviceChooser::boxed();
 
+    terminal.clear()?;
+
     loop {
         let window_size = crossterm::terminal::window_size()?;
         terminal.draw(|frame| model.draw(frame, window_size))?;
@@ -66,16 +68,20 @@ fn main() -> std::io::Result<()> {
                 );
 
                 match Visualizer::boxed(device_name, is_output_device) {
-                    Ok(visualizer) => model = visualizer,
+                    Ok(visualizer) => {
+                        model = visualizer;
+                        action = Action::None;
+                    }
                     Err(err) => {
                         tracing::error!("Couldn't start visualizer: {}", err);
                         action = Action::StartDeviceMenu;
                     }
-                }
+                };
             }
             Action::StartDeviceMenu => {
                 model = DeviceChooser::boxed();
-                action = Action::StartDeviceMenu;
+                terminal.clear()?;
+                action = Action::None;
             }
             Action::Quit => break,
             Action::None => {}

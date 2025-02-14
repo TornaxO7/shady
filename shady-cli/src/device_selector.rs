@@ -11,6 +11,7 @@ use ratatui::{
 use shady_audio::cpal::{
     self,
     traits::{DeviceTrait, HostTrait},
+    Device, SampleFormat,
 };
 use tracing::warn;
 
@@ -30,7 +31,7 @@ impl DeviceChooser {
 
         let input_devices = match host.input_devices() {
             Ok(input_devices) => input_devices
-                .filter(|device| device.name().is_ok())
+                .filter(device_condition)
                 .map(|device| device.name().unwrap())
                 .collect(),
             Err(err) => {
@@ -41,7 +42,7 @@ impl DeviceChooser {
 
         let output_devices = match host.output_devices() {
             Ok(output_devices) => output_devices
-                .filter(|device| device.name().is_ok())
+                .filter(device_condition)
                 .map(|device| device.name().unwrap())
                 .collect(),
             Err(err) => {
@@ -200,5 +201,16 @@ impl Model for DeviceChooser {
         }
 
         Action::None
+    }
+}
+
+fn device_condition(device: &Device) -> bool {
+    if device.name().is_err() {
+        return false;
+    }
+
+    match device.supported_output_configs() {
+        Ok(mut configs) => configs.any(|config| config.sample_format() == SampleFormat::F32),
+        Err(_) => false,
     }
 }
