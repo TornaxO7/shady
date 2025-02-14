@@ -24,10 +24,7 @@ struct Cli {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Action {
-    StartVisualizer {
-        device_name: String,
-        is_output_device: bool,
-    },
+    StartVisualizer { device_name: String },
     StartDeviceMenu,
     Quit,
     None,
@@ -58,16 +55,10 @@ fn main() -> std::io::Result<()> {
         }
 
         match action.clone() {
-            Action::StartVisualizer {
-                device_name,
-                is_output_device,
-            } => {
-                debug!(
-                    "Selected device: '{}'. Is output device: {}",
-                    device_name, is_output_device
-                );
+            Action::StartVisualizer { device_name } => {
+                debug!("Selected device: '{}'", device_name);
 
-                match Visualizer::boxed(device_name, is_output_device) {
+                match Visualizer::boxed(device_name) {
                     Ok(visualizer) => {
                         model = visualizer;
                         action = Action::None;

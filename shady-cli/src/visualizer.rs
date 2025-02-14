@@ -33,32 +33,22 @@ pub struct Visualizer<'a> {
 }
 
 impl<'a> Visualizer<'a> {
-    pub fn boxed(device_name: String, is_output_device: bool) -> Result<Box<Self>, String> {
+    pub fn boxed(device_name: String) -> Result<Box<Self>, String> {
         let device = {
             let host = cpal::default_host();
 
-            if is_output_device {
-                host.output_devices()
-                    .unwrap()
-                    .find(|device| match device.name() {
-                        Ok(name) => name == device_name,
-                        Err(_) => false,
-                    })
-                    .unwrap()
-            } else {
-                host.input_devices()
-                    .unwrap()
-                    .find(|device| match device.name() {
-                        Ok(name) => name == device_name,
-                        Err(_) => false,
-                    })
-                    .unwrap()
-            }
+            host.output_devices()
+                .unwrap()
+                .find(|device| match device.name() {
+                    Ok(name) => name == device_name,
+                    Err(_) => false,
+                })
+                .unwrap()
         };
 
         let config = {
             let Ok(supported_output_configs) = device.supported_output_configs() else {
-                todo!();
+                unreachable!("Should be avoided by the device chooser.");
             };
 
             let mut supported_output_configs: Vec<_> = supported_output_configs
