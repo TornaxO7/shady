@@ -88,8 +88,8 @@ impl Model for DeviceChooser {
         if let Event::Key(KeyEvent { code, .. }) = event {
             match code {
                 KeyCode::Char('q') => return Action::Quit,
-                KeyCode::Char('j') => self.list_state.select_next(),
-                KeyCode::Char('k') => self.list_state.select_previous(),
+                KeyCode::Char('j') | KeyCode::Down => self.list_state.select_next(),
+                KeyCode::Char('k') | KeyCode::Up => self.list_state.select_previous(),
                 KeyCode::Enter => {
                     if let Some(device_name) = self.selected() {
                         return Action::StartVisualizer { device_name };
