@@ -35,7 +35,7 @@ impl Resource for Audio {
         let buffer = Self::create_storage_buffer(device);
 
         let shady_audio = ShadyAudio::new(
-            SystemAudioFetcher::default(|err| panic!("{}", err)),
+            SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
             ShadyAudioConfig {
                 amount_bars: NonZeroUsize::new(AUDIO_BUFFER_SIZE).unwrap(),
                 ..Default::default()
