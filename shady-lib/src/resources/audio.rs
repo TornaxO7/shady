@@ -7,7 +7,7 @@ use crate::template::TemplateGenerator;
 
 use super::Resource;
 
-const AUDIO_BUFFER_SIZE: usize = 20;
+const AUDIO_BUFFER_SIZE: usize = 60;
 const DESCRIPTION: &str = "\
 // It contains the 'presence' of a frequency. The lower the index the lower is its frequency and the other way round.
 // So for example, if you are interested in the bass, choose the lower indices.";
@@ -83,12 +83,11 @@ impl TemplateGenerator for Audio {
             "
 {}
 @group({}) @binding({})
-var<storage, read> iAudio: array<f32, {}>;
+var<storage, read> iAudio: array<f32>;
 ",
             DESCRIPTION,
             bind_group_index,
             Self::binding(),
-            AUDIO_BUFFER_SIZE
         ))
     }
 
@@ -97,12 +96,11 @@ var<storage, read> iAudio: array<f32, {}>;
             "
 {}
 layout(binding = {}) readonly buffer iAudio {{
-    float freqs[{}];
+    float[] freqs;
 }};
 ",
             DESCRIPTION,
             Self::binding(),
-            AUDIO_BUFFER_SIZE
         ))
     }
 }
