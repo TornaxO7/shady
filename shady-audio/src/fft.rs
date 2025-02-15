@@ -59,6 +59,7 @@ impl FftCalculator {
         }
     }
 
+    #[inline]
     pub fn process(&mut self, new_samples: &[f32]) -> &[Complex32] {
         let new_len = new_samples.len().min(self.fft_size);
 

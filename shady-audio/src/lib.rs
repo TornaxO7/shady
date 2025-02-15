@@ -127,6 +127,7 @@ impl ShadyAudio {
     /// Return the bars with their values.
     ///
     /// Each bar value tries to stay within the range `[0, 1]` but it could happen that there are some spikes.
+    #[inline]
     pub fn get_bars(&mut self) -> &[f32] {
         self.fetcher.fetch_samples(&mut self.sample_buffer);
         let fft_out = self.fft.process(&self.sample_buffer);
