@@ -96,7 +96,7 @@ var<storage, read> iAudio: array<f32, {}>;
         writer.write_fmt(format_args!(
             "
 {}
-layout(binding = {}) buffer iAudio {{
+layout(binding = {}) readonly buffer iAudio {{
     float freqs[{}];
 }};
 ",
