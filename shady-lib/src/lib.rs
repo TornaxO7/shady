@@ -5,10 +5,10 @@ mod template;
 mod vertices;
 
 use resources::Resources;
-use std::{borrow::Cow, fmt};
+use std::fmt;
 use template::TemplateGenerator;
 use tracing::instrument;
-use wgpu::{CommandEncoder, Device, TextureView};
+use wgpu::{CommandEncoder, Device, ShaderSource, TextureView};
 
 pub use descriptor::ShadyDescriptor;
 
@@ -36,12 +36,11 @@ pub enum Error {
     InvalidGlslFragmentShader(String),
 }
 
-pub struct Shady<P: ShaderParser> {
+pub struct Shady {
     resources: Resources,
     bind_group: wgpu::BindGroup,
-    shader_parser: P,
 
-    pipeline: wgpu::RenderPipeline,
+    pipeline: Option<wgpu::RenderPipeline>,
     bind_group_index: u32,
     vbuffer_index: u32,
 
@@ -52,92 +51,79 @@ pub struct Shady<P: ShaderParser> {
 }
 
 // General functions
-impl<P: ShaderParser> Shady<P> {
+impl Shady {
     #[instrument(level = "trace")]
-    pub fn new(desc: &ShadyDescriptor) -> Result<Self, Error> {
+    pub fn new<'a>(desc: ShadyDescriptor) -> Result<Self, Error> {
         let ShadyDescriptor {
             device,
-            fragment_shader,
+            shader_source,
             texture_format,
             bind_group_index,
             vertex_buffer_index,
         } = desc;
 
         let resources = Resources::new(device);
-        let mut shader_parser = P::new();
 
         let bind_group = resources.bind_group(device);
 
-        let pipeline = {
+        let pipeline = shader_source.map(|shader| {
             let bind_group_layout = Resources::bind_group_layout(device);
 
-            get_render_pipeline(
-                device,
-                fragment_shader,
-                &mut shader_parser,
-                bind_group_layout,
-                texture_format,
-            )
-        }?;
+            get_render_pipeline(device, shader, bind_group_layout, &texture_format)
+        });
 
         Ok(Self {
             resources,
             bind_group,
-            shader_parser,
             pipeline,
-            texture_format: *texture_format,
-            bind_group_index: *bind_group_index,
-            vbuffer_index: *vertex_buffer_index,
+            texture_format,
+            bind_group_index,
+            vbuffer_index: vertex_buffer_index,
             vbuffer: vertices::vertex_buffer(device),
             ibuffer: vertices::index_buffer(device),
         })
     }
 
     pub fn add_render_pass(&self, encoder: &mut CommandEncoder, texture_view: &TextureView) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: texture_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            ..Default::default()
-        });
+        if let Some(pipeline) = &self.pipeline {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: texture_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                ..Default::default()
+            });
 
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(self.bind_group_index, &self.bind_group, &[]);
-        render_pass.set_vertex_buffer(self.vbuffer_index, self.vbuffer.slice(..));
-        render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(crate::index_buffer_range(), 0, 0..1);
+            render_pass.set_pipeline(pipeline);
+            render_pass.set_bind_group(self.bind_group_index, &self.bind_group, &[]);
+            render_pass.set_vertex_buffer(self.vbuffer_index, self.vbuffer.slice(..));
+            render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(crate::index_buffer_range(), 0, 0..1);
+        }
     }
 
-    #[instrument(skip(self, device, fragment_shader), level = "trace")]
-    pub fn update_render_pipeline<S: AsRef<str>>(
-        &mut self,
-        device: &Device,
-        fragment_shader: S,
-    ) -> Result<(), Error> {
+    #[instrument(skip(self, device), level = "trace")]
+    pub fn update_render_pipeline<'a>(&mut self, device: &Device, shader_source: ShaderSource<'a>) {
         #[cfg(feature = "frame")]
         self.resources.frame.reset_counter();
         let bind_group_layout = Resources::bind_group_layout(device);
 
-        self.pipeline = get_render_pipeline(
+        self.pipeline = Some(get_render_pipeline(
             device,
-            fragment_shader,
-            &mut self.shader_parser,
+            shader_source,
             bind_group_layout,
             &self.texture_format,
-        )?;
-
-        Ok(())
+        ));
     }
 }
 
 /// Updating functions
-impl<P: ShaderParser> Shady<P> {
+impl Shady {
     #[cfg(feature = "resolution")]
     pub fn update_resolution(&mut self, width: u32, height: u32) {
         debug_assert!(width > 0);
@@ -163,26 +149,21 @@ impl<P: ShaderParser> Shady<P> {
     }
 }
 
-fn get_render_pipeline<S: AsRef<str>, P: ShaderParser>(
+fn get_render_pipeline<'a>(
     device: &Device,
-    fragment_shader: S,
-    shader_parser: &mut P,
+    shader_source: ShaderSource<'a>,
     bind_group_layout: wgpu::BindGroupLayout,
     texture_format: &wgpu::TextureFormat,
-) -> Result<wgpu::RenderPipeline, Error> {
+) -> wgpu::RenderPipeline {
     let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Shady vertex shader"),
         source: wgpu::ShaderSource::Wgsl(include_str!("vertex_shader.wgsl").into()),
     });
 
-    let fragment_shader = {
-        let fragment_module = shader_parser.parse(fragment_shader.as_ref())?;
-
-        device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shady fragment shader"),
-            source: wgpu::ShaderSource::Naga(Cow::Owned(fragment_module)),
-        })
-    };
+    let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Shady fragment shader"),
+        source: shader_source,
+    });
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Shady pipeline layout"),
@@ -228,7 +209,7 @@ fn get_render_pipeline<S: AsRef<str>, P: ShaderParser>(
         cache: None,
     });
 
-    Ok(pipeline)
+    pipeline
 }
 
 pub fn get_template(
