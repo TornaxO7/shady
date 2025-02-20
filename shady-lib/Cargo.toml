@@ -5,11 +5,12 @@ edition = "2021"
 authors = ["TornaxO7 <tornax@pm.me>"]
 description = "A shadertoy-like library to be able to easily integrate shadertoy-like stuff in your applications."
 license = "GPL-3.0-or-later"
+repository = "https://github.com/TornaxO7/shady/tree/main/shady-lib"
 
 [dependencies]
 bytemuck = { version = "1", features = ["derive"] }
 
-shady-audio = { path = "../shady-audio", optional = true }
+shady-audio = { path = "../shady-audio", version = "2.0", optional = true }
 
 wgpu.workspace = true
 tracing.workspace = true
