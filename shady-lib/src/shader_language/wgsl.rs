@@ -9,14 +9,13 @@ impl Wgsl {
     pub fn new() -> Self {
         Self(wgpu::naga::front::wgsl::Frontend::new())
     }
+
+    pub fn boxed() -> Box<Self> {
+        Box::new(Self::new())
+    }
 }
 
 impl ShaderParser for Wgsl {
-    #[instrument(level = "trace")]
-    fn new() -> Self {
-        Self::new()
-    }
-
     #[instrument(skip(self), level = "trace")]
     fn parse(&mut self, fragment_shader: &str) -> Result<wgpu::naga::Module, crate::Error> {
         self.0.parse(fragment_shader).map_err(|err| {

@@ -1,10 +1,11 @@
 /// Every relevant part is marked with the prefix `SHADY` so you can just search in this code with `SHADY`.
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use pollster::FutureExt;
-use shady::{Shady, ShadyDescriptor, Wgsl};
+use shady::{Shady, ShadyDescriptor};
 use wgpu::{
-    Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, TextureViewDescriptor,
+    Backends, Device, Instance, Queue, ShaderSource, Surface, SurfaceConfiguration,
+    TextureViewDescriptor,
 };
 use winit::{
     application::ApplicationHandler,
@@ -24,7 +25,7 @@ struct State<'a> {
     config: SurfaceConfiguration,
     window: Arc<Window>,
     // SHADY
-    shady: Shady<Wgsl>,
+    shady: Shady,
 }
 
 impl<'a> State<'a> {
@@ -83,18 +84,18 @@ impl<'a> State<'a> {
                     &mut fragment_code,
                 )
                 .unwrap();
-                fragment_code
+
+                ShaderSource::Wgsl(Cow::Owned(fragment_code))
             };
 
             // SHADY
-            let shady = Shady::new(&ShadyDescriptor {
+            let shady = Shady::new(ShadyDescriptor {
                 device: &device,
-                fragment_shader: &fragment_shader,
+                initial_fragment_shader: Some(fragment_shader),
                 texture_format: surface_format,
                 bind_group_index: SHADY_BIND_GROUP_INDEX,
                 vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
-            })
-            .unwrap();
+            });
 
             (config, shady)
         };

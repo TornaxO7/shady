@@ -4,6 +4,7 @@ mod dummy;
 mod system_audio;
 
 use cpal::SampleRate;
+
 pub use dummy::DummyFetcher;
 pub use system_audio::{SystemAudio as SystemAudioFetcher, SystemAudioError};
 

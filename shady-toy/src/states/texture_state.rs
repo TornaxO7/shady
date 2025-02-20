@@ -1,8 +1,9 @@
 use image::{ImageBuffer, Rgba};
 use pollster::FutureExt;
-use shady::{ShaderParser, Shady, ShadyDescriptor, Wgsl};
+use shady::{Shady, ShadyDescriptor, Wgsl};
 use wgpu::{
-    Backends, Buffer, BufferView, Device, DeviceDescriptor, Extent3d, Instance, Queue, Texture,
+    Backends, Buffer, BufferView, Device, DeviceDescriptor, Extent3d, Instance, Queue,
+    ShaderSource, Texture,
 };
 use winit::dpi::PhysicalSize;
 
@@ -14,7 +15,7 @@ type Bytes = u32;
 const MIN_BYTES_WIDTH: Bytes = 256;
 const OUTPUT_BUFFER_VALUE_SIZE: u32 = std::mem::size_of::<u32>() as u32;
 
-pub struct TextureState<S: ShaderParser> {
+pub struct TextureState {
     size: PhysicalSize<u32>,
     texture: Texture,
     output_buffer: Buffer,
@@ -22,10 +23,10 @@ pub struct TextureState<S: ShaderParser> {
 
     device: Device,
     queue: Queue,
-    shady: Shady<S>,
+    shady: Shady,
 }
 
-impl<S: ShaderParser> TextureState<S> {
+impl TextureState {
     pub fn get_output(&self) -> ImageBuffer<Rgba<u8>, BufferView> {
         let buffer_slice = self.output_buffer.slice(..);
 
@@ -43,7 +44,10 @@ impl<S: ShaderParser> TextureState<S> {
             .expect("Create image buffer from wgpu output buffer")
     }
 
-    pub fn new(texture_size: PhysicalSize<u32>, fragment_code: &str) -> Result<Self, shady::Error> {
+    pub fn new<'a>(
+        texture_size: PhysicalSize<u32>,
+        shader_source: Option<ShaderSource<'a>>,
+    ) -> Self {
         assert!(
             MIN_BYTES_WIDTH / OUTPUT_BUFFER_VALUE_SIZE >= 64,
             "Width must be at least {}.",
@@ -96,15 +100,15 @@ impl<S: ShaderParser> TextureState<S> {
             view_formats: &[],
         });
 
-        let shady = Shady::new(&ShadyDescriptor {
+        let shady = Shady::new(ShadyDescriptor {
             device: &device,
-            fragment_shader: fragment_code,
+            initial_fragment_shader: shader_source,
             texture_format,
             bind_group_index: SHADY_BIND_GROUP_INDEX,
             vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
-        })?;
+        });
 
-        Ok(Self {
+        Self {
             size: texture_size,
             texture_extent,
             texture,
@@ -112,11 +116,11 @@ impl<S: ShaderParser> TextureState<S> {
             queue,
             shady,
             output_buffer,
-        })
+        }
     }
 }
 
-impl<S: ShaderParser> RenderState<S> for TextureState<S> {
+impl RenderState for TextureState {
     fn prepare_next_frame(&mut self) {
         self.shady.prepare_next_frame(&mut self.queue);
     }
@@ -157,9 +161,9 @@ impl<S: ShaderParser> RenderState<S> for TextureState<S> {
         Ok(())
     }
 
-    fn update_pipeline(&mut self, fragment_code: &str) -> Result<(), shady::Error> {
+    fn update_pipeline<'a>(&mut self, shader_source: ShaderSource<'a>) {
         self.shady
-            .update_render_pipeline(&self.device, fragment_code)
+            .update_render_pipeline(&self.device, shader_source)
     }
 }
 
@@ -178,7 +182,10 @@ fn red_screen() {
         height: 1,
     };
 
-    let mut state = TextureState::<Wgsl>::new(size, &frag_code).unwrap();
+    let mut state = TextureState::new(
+        size,
+        Some(ShaderSource::Wgsl(std::borrow::Cow::Borrowed(frag_code))),
+    );
     state.render().unwrap();
 
     let out = state.get_output();

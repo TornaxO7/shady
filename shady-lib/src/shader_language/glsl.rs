@@ -10,14 +10,13 @@ impl Glsl {
     pub fn new() -> Self {
         Self(wgpu::naga::front::glsl::Frontend::default())
     }
+
+    pub fn boxed() -> Box<Self> {
+        Box::new(Self::new())
+    }
 }
 
 impl ShaderParser for Glsl {
-    #[instrument(level = "trace")]
-    fn new() -> Self {
-        Self::new()
-    }
-
     #[instrument(skip(self), level = "trace")]
     fn parse(&mut self, fragment_shader: &str) -> Result<wgpu::naga::Module, crate::Error> {
         let parse_options = Options::from(ShaderStage::Fragment);

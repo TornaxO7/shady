@@ -88,16 +88,8 @@ fn start_app(fragment_path: PathBuf, frontend: ShaderLanguage) -> Result<()> {
         move || watch_shader_file(path, proxy)
     });
 
-    match frontend {
-        ShaderLanguage::Wgsl => {
-            let mut renderer = Renderer::<shady::Wgsl>::new(fragment_path)?;
-            event_loop.run_app(&mut renderer)?;
-        }
-        ShaderLanguage::Glsl => {
-            let mut renderer = Renderer::<shady::Glsl>::new(fragment_path)?;
-            event_loop.run_app(&mut renderer)?;
-        }
-    }
+    let mut renderer = Renderer::new(fragment_path, frontend).expect("Init renderer");
+    event_loop.run_app(&mut renderer)?;
 
     Ok(())
 }

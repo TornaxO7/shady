@@ -1,9 +1,12 @@
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{borrow::Cow, fs::File, io::Read, path::PathBuf};
 
 use ariadne::{Color, Fmt, Label, Report, Source};
-use shady::{MouseState, ShaderParser};
+use shady::MouseState;
 use tracing::{debug, warn};
-use wgpu::SurfaceError;
+use wgpu::{
+    naga::{FastHashMap, ShaderStage},
+    ShaderSource, SurfaceError,
+};
 use winit::{
     application::ApplicationHandler,
     event::{ElementState, WindowEvent},
@@ -12,6 +15,7 @@ use winit::{
 };
 
 use crate::{
+    frontend::ShaderLanguage,
     states::{window_state::WindowState, RenderState},
     UserEvent,
 };
@@ -25,21 +29,22 @@ enum RenderError {
     IO(#[from] std::io::Error),
 }
 
-pub struct Renderer<'a, S: ShaderParser> {
-    state: Option<WindowState<'a, S>>,
+pub struct Renderer<'a> {
+    state: Option<WindowState<'a>>,
     display_error: bool,
 
+    shader_lang: ShaderLanguage,
+
     fragment_path: PathBuf,
-    fragment_code: String,
 }
 
-impl<'a, F: ShaderParser> Renderer<'a, F> {
-    pub fn new(fragment_path: PathBuf) -> anyhow::Result<Self> {
+impl<'a> Renderer<'a> {
+    pub fn new(fragment_path: PathBuf, shader_lang: ShaderLanguage) -> anyhow::Result<Self> {
         let mut renderer = Self {
             state: None,
             display_error: true,
             fragment_path,
-            fragment_code: String::new(),
+            shader_lang,
         };
 
         renderer.refresh_fragment_code()?;
@@ -54,19 +59,28 @@ impl<'a, F: ShaderParser> Renderer<'a, F> {
             self.fragment_path.to_string_lossy()
         );
         let mut file = File::open(&self.fragment_path)?;
-        self.fragment_code.clear();
-        file.read_to_string(&mut self.fragment_code)?;
+        let mut fragment_code = String::new();
+        file.read_to_string(&mut fragment_code)?;
+
+        let cow_code = Cow::Owned(fragment_code);
 
         if let Some(state) = &mut self.state {
-            if let Err(err) = state.update_pipeline(&self.fragment_code) {
-                self.print_shady_error(err);
-            }
+            let shader_source = match self.shader_lang {
+                ShaderLanguage::Wgsl => ShaderSource::Wgsl(cow_code),
+                ShaderLanguage::Glsl => ShaderSource::Glsl {
+                    shader: cow_code,
+                    stage: ShaderStage::Fragment,
+                    defines: FastHashMap::default(),
+                },
+            };
+
+            state.update_pipeline(shader_source);
         }
 
         Ok(())
     }
 
-    fn print_shady_error(&mut self, err: shady::Error) {
+    fn _print_shady_error(&mut self, err: shady::Error) {
         self.display_error = false;
         match err {
             shady::Error::InvalidWgslFragmentShader {
@@ -98,16 +112,13 @@ impl<'a, F: ShaderParser> Renderer<'a, F> {
     }
 }
 
-impl<'a, F: ShaderParser> ApplicationHandler<UserEvent> for Renderer<'a, F> {
+impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = event_loop
             .create_window(WindowAttributes::default())
             .unwrap();
 
-        match WindowState::<F>::new(window, &self.fragment_code) {
-            Ok(state) => self.state = Some(state),
-            Err(err) => self.print_shady_error(err),
-        }
+        self.state = Some(WindowState::new(window, None));
     }
 
     fn window_event(

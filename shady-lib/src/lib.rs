@@ -1,6 +1,5 @@
 mod descriptor;
 mod resources;
-mod shader_language;
 mod template;
 mod vertices;
 
@@ -14,7 +13,6 @@ pub use descriptor::ShadyDescriptor;
 
 #[cfg(feature = "mouse")]
 pub use resources::MouseState;
-pub use shader_language::{Glsl, ShaderParser, Wgsl};
 pub use template::TemplateLang;
 pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
 
@@ -53,10 +51,10 @@ pub struct Shady {
 // General functions
 impl Shady {
     #[instrument(level = "trace")]
-    pub fn new<'a>(desc: ShadyDescriptor) -> Result<Self, Error> {
+    pub fn new<'a>(desc: ShadyDescriptor) -> Self {
         let ShadyDescriptor {
             device,
-            shader_source,
+            initial_fragment_shader,
             texture_format,
             bind_group_index,
             vertex_buffer_index,
@@ -66,13 +64,13 @@ impl Shady {
 
         let bind_group = resources.bind_group(device);
 
-        let pipeline = shader_source.map(|shader| {
+        let pipeline = initial_fragment_shader.map(|shader| {
             let bind_group_layout = Resources::bind_group_layout(device);
 
             get_render_pipeline(device, shader, bind_group_layout, &texture_format)
         });
 
-        Ok(Self {
+        Self {
             resources,
             bind_group,
             pipeline,
@@ -81,7 +79,7 @@ impl Shady {
             vbuffer_index: vertex_buffer_index,
             vbuffer: vertices::vertex_buffer(device),
             ibuffer: vertices::index_buffer(device),
-        })
+        }
     }
 
     pub fn add_render_pass(&self, encoder: &mut CommandEncoder, texture_view: &TextureView) {

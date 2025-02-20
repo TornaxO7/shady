@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use pollster::FutureExt;
-use shady::{ShaderParser, Shady, ShadyDescriptor};
-use tracing::trace;
+use shady::{Shady, ShadyDescriptor};
 use wgpu::{
-    Backends, Device, Instance, Queue, Surface, SurfaceConfiguration, TextureViewDescriptor,
+    Backends, Device, Instance, Queue, ShaderSource, Surface, SurfaceConfiguration,
+    TextureViewDescriptor,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -12,21 +12,17 @@ use super::{SHADY_BIND_GROUP_INDEX, SHADY_VERTEX_BUFFER_INDEX};
 
 use super::RenderState;
 
-pub struct WindowState<'a, S: ShaderParser> {
+pub struct WindowState<'a> {
     surface: Surface<'a>,
     device: Device,
     queue: Queue,
     config: SurfaceConfiguration,
     window: Arc<Window>,
-    pub shady: Shady<S>,
+    pub shady: Shady,
 }
 
-impl<'a, S: ShaderParser> WindowState<'a, S> {
-    pub fn new(window: Window, fragment_code: &str) -> Result<Self, shady::Error> {
-        trace!(
-            "Create new WindowState with fragment code:\n{}",
-            fragment_code
-        );
+impl<'a> WindowState<'a> {
+    pub fn new(window: Window, shader_source: Option<ShaderSource>) -> Self {
         let window = Arc::new(window);
 
         let instance = Instance::new(wgpu::InstanceDescriptor {
@@ -73,27 +69,27 @@ impl<'a, S: ShaderParser> WindowState<'a, S> {
                 desired_maximum_frame_latency: 2,
             };
 
-            let shady = Shady::new(&ShadyDescriptor {
+            let shady = Shady::new(ShadyDescriptor {
                 device: &device,
-                fragment_shader: fragment_code,
+                initial_fragment_shader: shader_source,
                 texture_format: surface_format,
                 bind_group_index: SHADY_BIND_GROUP_INDEX,
                 vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
-            })?;
+            });
 
             (config, shady)
         };
 
         surface.configure(&device, &config);
 
-        Ok(Self {
+        Self {
             surface,
             device,
             queue,
             config,
             window,
             shady,
-        })
+        }
     }
 
     pub fn window(&self) -> Arc<Window> {
@@ -111,7 +107,7 @@ impl<'a, S: ShaderParser> WindowState<'a, S> {
     }
 }
 
-impl<'a, S: ShaderParser> RenderState<S> for WindowState<'a, S> {
+impl<'a> RenderState<'a> for WindowState<'a> {
     fn prepare_next_frame(&mut self) {
         self.shady.prepare_next_frame(&mut self.queue);
     }
@@ -136,8 +132,8 @@ impl<'a, S: ShaderParser> RenderState<S> for WindowState<'a, S> {
         Ok(())
     }
 
-    fn update_pipeline(&mut self, fragment_code: &str) -> Result<(), shady::Error> {
+    fn update_pipeline(&mut self, shader_source: ShaderSource<'a>) {
         self.shady
-            .update_render_pipeline(&self.device, fragment_code)
+            .update_render_pipeline(&self.device, shader_source);
     }
 }
