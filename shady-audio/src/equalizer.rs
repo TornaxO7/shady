@@ -7,6 +7,8 @@ use tracing::{debug, instrument};
 
 use crate::{Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
 
+const DEFAULT_INIT_SENSITIVITY: f32 = 1.;
+
 #[derive(Debug)]
 pub struct Equalizer {
     bar_values: Box<[f32]>,
@@ -23,7 +25,7 @@ impl Equalizer {
         freq_range: Range<Hz>,
         sample_len: usize, // = fft size
         sample_rate: SampleRate,
-        sensitivity: Option<f32>,
+        init_sensitivity: Option<f32>,
     ) -> Self {
         assert!(sample_rate.0 > 0);
 
@@ -86,7 +88,7 @@ impl Equalizer {
             bar_values,
             bar_ranges,
             started_falling,
-            sensitivity: sensitivity.unwrap_or(1.),
+            sensitivity: init_sensitivity.unwrap_or(DEFAULT_INIT_SENSITIVITY),
         }
     }
 

@@ -8,7 +8,8 @@
 //! to your dependency list.
 //!
 //! # How to get started
-//! You mainly interact with [ShadyAudio].
+//! The main usage can be seen in the example below.
+//! Take a look to the available methods of [ShadyAudio] if you would like to change some properties of it (like frequency range or amount of bars).
 //!
 //! # Example
 //! ```rust
@@ -64,7 +65,10 @@ use cpal::SampleRate;
 use equalizer::Equalizer;
 use fetcher::Fetcher;
 use fft::FftCalculator;
-use std::{num::NonZeroUsize, ops::Range};
+use std::{
+    num::{NonZeroU32, NonZeroUsize},
+    ops::Range,
+};
 
 struct State {
     amount_bars: usize,
@@ -126,7 +130,8 @@ impl ShadyAudio {
 
     /// Return the bars with their values.
     ///
-    /// Each bar value tries to stay within the range `[0, 1]` but it could happen that there are some spikes.
+    /// Each bar value tries to stay within the range `[0, 1]` but it could happen that there are some spikes which go above 1.
+    /// However it will slowly normalize itself back to 1.
     #[inline]
     pub fn get_bars(&mut self) -> &[f32] {
         self.fetcher.fetch_samples(&mut self.sample_buffer);
@@ -134,11 +139,25 @@ impl ShadyAudio {
         let bars = self.equalizer.process(fft_out);
 
         self.sample_buffer.clear();
-
         bars
     }
 
     /// Set the length of the returned slice of [`Self::get_bars`].
+    ///
+    /// # Example
+    /// ```
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    /// use std::num::NonZeroUsize;
+    ///
+    /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default()).unwrap();
+    ///
+    /// // tell `shady-audio` to compute only for four bars
+    /// let amount_bars = 4;
+    /// shady_audio.set_bars(NonZeroUsize::new(amount_bars).unwrap());
+    ///
+    /// assert_eq!(shady_audio.get_bars().len(), amount_bars);
+    /// ```
+    #[inline]
     pub fn set_bars(&mut self, amount_bars: NonZeroUsize) {
         self.state.amount_bars = usize::from(amount_bars);
 
@@ -151,5 +170,57 @@ impl ShadyAudio {
             self.state.sample_rate,
             Some(self.state.sensitivity),
         );
+    }
+
+    /// Change the fetcher.
+    ///
+    /// # Example
+    /// ```
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    ///
+    /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default()).unwrap();
+    ///
+    /// let another_fetcher = DummyFetcher::new();
+    /// shady_audio.set_fetcher(another_fetcher);
+    /// ```
+    #[inline]
+    pub fn set_fetcher(&mut self, fetcher: Box<dyn Fetcher>) {
+        self.fetcher = fetcher;
+    }
+
+    /// Update the frequency range where `shady-audio` should process.
+    ///
+    /// Retunrs `Err` if the given range [is empty](https://doc.rust-lang.org/std/ops/struct.Range.html#method.is_empty) otherwise `Ok`.
+    ///
+    /// # Example
+    /// ```
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    /// use std::num::NonZeroU32;
+    ///
+    /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default()).unwrap();
+    ///
+    /// // tell `shady-audio` to just create the bars for the frequencies from 1kHz to 15kHz.
+    /// shady_audio.update_freq_range(NonZeroU32::new(1_000).unwrap()..NonZeroU32::new(15_000).unwrap()).unwrap();
+    ///
+    /// // empty ranges are not allowed!
+    /// assert!(shady_audio.update_freq_range(NonZeroU32::new(5).unwrap()..NonZeroU32::new(5).unwrap()).is_err());
+    /// ```
+    #[inline]
+    pub fn update_freq_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
+        if freq_range.is_empty() {
+            return Err(());
+        }
+        let freq_range = u32::from(freq_range.start)..u32::from(freq_range.end);
+
+        self.state.freq_range = freq_range;
+        self.equalizer = Equalizer::new(
+            self.state.amount_bars,
+            self.state.freq_range.clone(),
+            self.fft.size(),
+            self.state.sample_rate,
+            Some(self.state.sensitivity),
+        );
+
+        Ok(())
     }
 }
