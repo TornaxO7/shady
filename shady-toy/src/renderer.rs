@@ -1,10 +1,13 @@
 use std::{borrow::Cow, fs::File, io::Read, path::PathBuf};
 
-use ariadne::{Color, Fmt, Label, Report, Source};
+use ariadne::{Color, Fmt};
 use shady::MouseState;
 use tracing::{debug, warn};
 use wgpu::{
-    naga::{FastHashMap, ShaderStage},
+    naga::{
+        front::{glsl, wgsl},
+        ShaderStage,
+    },
     ShaderSource, SurfaceError,
 };
 use winit::{
@@ -27,6 +30,12 @@ enum RenderError {
 
     #[error(transparent)]
     IO(#[from] std::io::Error),
+
+    #[error("{0}")]
+    WgslParsing(String),
+
+    #[error("{0}")]
+    GlslParsing(String),
 }
 
 pub struct Renderer<'a> {
@@ -62,53 +71,35 @@ impl<'a> Renderer<'a> {
         let mut fragment_code = String::new();
         file.read_to_string(&mut fragment_code)?;
 
-        let cow_code = Cow::Owned(fragment_code);
+        debug!("Fragment code: {}", fragment_code);
 
         if let Some(state) = &mut self.state {
-            let shader_source = match self.shader_lang {
-                ShaderLanguage::Wgsl => ShaderSource::Wgsl(cow_code),
-                ShaderLanguage::Glsl => ShaderSource::Glsl {
-                    shader: cow_code,
-                    stage: ShaderStage::Fragment,
-                    defines: FastHashMap::default(),
-                },
+            let module = match self.shader_lang {
+                ShaderLanguage::Wgsl => {
+                    debug!("Parsing with wgsl parser");
+                    let mut frontend = wgsl::Frontend::new();
+
+                    frontend.parse(&fragment_code).map_err(|err| {
+                        RenderError::WgslParsing(err.emit_to_string(&fragment_code))
+                    })?
+                }
+                ShaderLanguage::Glsl => {
+                    debug!("Parsing with glsl parser");
+                    let mut frontend = glsl::Frontend::default();
+                    let options = glsl::Options::from(ShaderStage::Fragment);
+
+                    frontend.parse(&options, &fragment_code).map_err(|err| {
+                        RenderError::GlslParsing(err.emit_to_string(&fragment_code))
+                    })?
+                }
             };
 
-            state.update_pipeline(shader_source);
+            state.update_pipeline(ShaderSource::Naga(Cow::Owned(module)));
+        } else {
+            debug!("State not initialized");
         }
 
         Ok(())
-    }
-
-    fn _print_shady_error(&mut self, err: shady::Error) {
-        self.display_error = false;
-        match err {
-            shady::Error::InvalidWgslFragmentShader {
-                msg,
-                fragment_code,
-                offset,
-                length,
-                ..
-            } => {
-                Report::build(
-                    ariadne::ReportKind::Error,
-                    offset as usize..(offset + length) as usize,
-                )
-                .with_message("Invalid fragment shader")
-                .with_label(
-                    Label::new(offset as usize..(offset + length) as usize)
-                        .with_message(msg.fg(ariadne::Color::Blue))
-                        .with_color(ariadne::Color::Blue),
-                )
-                .finish()
-                .print(Source::from(fragment_code))
-                .unwrap();
-            }
-
-            shady::Error::InvalidGlslFragmentShader(msg) => {
-                eprintln!("{}", msg);
-            }
-        };
     }
 }
 
@@ -119,6 +110,7 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
             .unwrap();
 
         self.state = Some(WindowState::new(window, None));
+        self.refresh_fragment_code().unwrap();
     }
 
     fn window_event(

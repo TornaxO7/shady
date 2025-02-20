@@ -1,14 +1,12 @@
 use tracing::debug;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::EnvFilter;
 
 pub fn init() {
-    let fmt_layer = tracing_subscriber::fmt::layer()
+    tracing_subscriber::fmt()
+        .without_time()
         .with_target(false)
-        .without_time();
-
-    tracing_subscriber::registry()
-        .with(fmt_layer)
-        .with(EnvFilter::from_env(EnvFilter::DEFAULT_ENV))
+        .with_env_filter(EnvFilter::from_default_env())
+        .pretty()
         .init();
 
     debug!("Logger initialised!");

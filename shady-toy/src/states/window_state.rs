@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use pollster::FutureExt;
 use shady::{Shady, ShadyDescriptor};
+use tracing::instrument;
 use wgpu::{
     Backends, Device, Instance, Queue, ShaderSource, Surface, SurfaceConfiguration,
     TextureViewDescriptor,
@@ -132,6 +133,7 @@ impl<'a> RenderState<'a> for WindowState<'a> {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     fn update_pipeline(&mut self, shader_source: ShaderSource<'a>) {
         self.shady
             .update_render_pipeline(&self.device, shader_source);

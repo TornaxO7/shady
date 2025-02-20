@@ -6,7 +6,7 @@ mod vertices;
 use resources::Resources;
 use std::fmt;
 use template::TemplateGenerator;
-use tracing::instrument;
+use tracing::{debug, instrument};
 use wgpu::{CommandEncoder, Device, ShaderSource, TextureView};
 
 pub use descriptor::ShadyDescriptor;
@@ -17,22 +17,6 @@ pub use template::TemplateLang;
 pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
 
 pub const FRAGMENT_ENTRYPOINT: &str = "main";
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("Invalid fragment shader in line {line_num}, column {line_pos}: {msg}")]
-    InvalidWgslFragmentShader {
-        fragment_code: String,
-        msg: String,
-        line_num: u32,
-        line_pos: u32,
-        offset: u32,
-        length: u32,
-    },
-
-    #[error("Invalid fragment shader: {0}")]
-    InvalidGlslFragmentShader(String),
-}
 
 pub struct Shady {
     resources: Resources,
@@ -102,6 +86,10 @@ impl Shady {
             render_pass.set_vertex_buffer(self.vbuffer_index, self.vbuffer.slice(..));
             render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(crate::index_buffer_range(), 0, 0..1);
+
+            debug!("Applied renderpass");
+        } else {
+            debug!("Pipeline not set!");
         }
     }
 
