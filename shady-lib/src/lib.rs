@@ -38,7 +38,7 @@ pub enum Error {
 
 pub struct Shady<P: ShaderParser> {
     resources: Resources,
-    pub bind_group: wgpu::BindGroup,
+    bind_group: wgpu::BindGroup,
     shader_parser: P,
 
     pipeline: wgpu::RenderPipeline,

@@ -142,7 +142,7 @@ impl SystemAudio {
     /// ```no_run
     /// use shady_audio::{ShadyAudio, config::ShadyAudioConfig, fetcher::SystemAudioFetcher};
     ///
-    /// let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)), ShadyAudioConfig::default());
+    /// let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(), ShadyAudioConfig::default());
     /// ```
     pub fn default<E>(error_callback: E) -> Result<Box<Self>, SystemAudioError>
     where
