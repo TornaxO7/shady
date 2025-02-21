@@ -19,7 +19,7 @@ struct SampleBuffer {
 
 impl SampleBuffer {
     pub fn new(sample_rate: SampleRate, channels: u16) -> Self {
-        let capacity = (sample_rate.0 * 10) as usize;
+        let capacity = (sample_rate.0 * 4) as usize;
         let buffer = vec![0.; capacity].into_boxed_slice();
 
         Self {
@@ -42,7 +42,7 @@ impl SampleBuffer {
             self.buffer[i] = values.iter().sum::<f32>() / self.channels as f32;
         }
 
-        self.length += data_len;
+        self.length = new_len;
     }
 
     pub fn clear(&mut self) {
