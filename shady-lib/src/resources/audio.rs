@@ -1,4 +1,8 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{
+    fmt,
+    num::{NonZeroU32, NonZeroUsize},
+    ops::Range,
+};
 
 use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
 use wgpu::Device;
@@ -7,7 +11,7 @@ use crate::template::TemplateGenerator;
 
 use super::Resource;
 
-const AUDIO_BUFFER_SIZE: usize = 60;
+const DEFAULT_AMOUNT_BARS: usize = 60;
 const DESCRIPTION: &str = "\
 // It contains the 'presence' of a frequency. The lower the index the lower is its frequency and the other way round.
 // So for example, if you are interested in the bass, choose the lower indices.";
@@ -15,7 +19,7 @@ const DESCRIPTION: &str = "\
 pub struct Audio {
     shady_audio: ShadyAudio,
 
-    audio_buffer: Box<[f32; AUDIO_BUFFER_SIZE]>,
+    bar_values: Box<[f32]>,
 
     buffer: wgpu::Buffer,
 }
@@ -24,12 +28,21 @@ impl Audio {
     pub fn fetch_audio(&mut self) {
         let bars = self.shady_audio.get_bars();
 
-        self.audio_buffer.copy_from_slice(bars);
+        self.bar_values.copy_from_slice(bars);
+    }
+
+    pub fn set_bars(&mut self, amount_bars: NonZeroUsize) {
+        self.shady_audio.set_bars(amount_bars);
+        self.bar_values = vec![0.; usize::from(amount_bars)].into_boxed_slice();
+    }
+
+    pub fn set_frequency_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
+        self.shady_audio.set_freq_range(freq_range)
     }
 }
 
 impl Resource for Audio {
-    type BufferDataType = [f32; AUDIO_BUFFER_SIZE];
+    type BufferDataType = [f32; DEFAULT_AMOUNT_BARS];
 
     fn new(device: &Device) -> Self {
         let buffer = Self::create_storage_buffer(device);
@@ -37,17 +50,17 @@ impl Resource for Audio {
         let shady_audio = ShadyAudio::new(
             SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
             ShadyAudioConfig {
-                amount_bars: NonZeroUsize::new(AUDIO_BUFFER_SIZE).unwrap(),
+                amount_bars: NonZeroUsize::new(DEFAULT_AMOUNT_BARS).unwrap(),
                 ..Default::default()
             },
         )
         .unwrap();
 
-        let audio_buffer = Box::new([0.; AUDIO_BUFFER_SIZE]);
+        let audio_buffer = Box::new([0.; DEFAULT_AMOUNT_BARS]);
 
         Self {
             shady_audio,
-            audio_buffer,
+            bar_values: audio_buffer,
             buffer,
         }
     }
@@ -69,8 +82,8 @@ impl Resource for Audio {
     }
 
     fn update_buffer(&self, queue: &mut wgpu::Queue) {
-        let bars = &self.audio_buffer;
-        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(bars.as_slice()));
+        let bars = &self.bar_values;
+        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(bars));
     }
 }
 

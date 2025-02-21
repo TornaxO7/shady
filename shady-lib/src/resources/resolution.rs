@@ -15,7 +15,7 @@ pub struct Resolution {
 }
 
 impl Resolution {
-    pub fn update_resolution(&mut self, width: u32, height: u32) {
+    pub fn set(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
             self.width = width;
             self.height = height;

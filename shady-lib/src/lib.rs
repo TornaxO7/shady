@@ -3,8 +3,12 @@ mod resources;
 mod template;
 mod vertices;
 
-use resources::Resources;
-use std::fmt;
+use resources::{Resource, Resources};
+use std::{
+    fmt,
+    num::{NonZeroU32, NonZeroUsize},
+    ops::Range,
+};
 use template::TemplateGenerator;
 use tracing::{debug, instrument};
 use wgpu::{CommandEncoder, Device, ShaderSource, TextureView};
@@ -108,30 +112,78 @@ impl Shady {
     }
 }
 
-/// Updating functions
+/// Update buffer functions
 impl Shady {
+    #[inline]
+    #[cfg(feature = "audio")]
+    pub fn update_audio_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.audio.fetch_audio();
+        self.resources.audio.update_buffer(queue);
+    }
+
+    #[inline]
+    #[cfg(feature = "frame")]
+    pub fn update_frame_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.frame.update_buffer(queue);
+    }
+
+    #[inline]
+    #[cfg(feature = "mouse")]
+    pub fn update_mouse_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.mouse.update_buffer(queue);
+    }
+
+    #[inline]
     #[cfg(feature = "resolution")]
-    pub fn update_resolution(&mut self, width: u32, height: u32) {
+    pub fn update_resolution_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.resolution.update_buffer(queue);
+    }
+
+    #[inline]
+    #[cfg(feature = "time")]
+    pub fn update_time_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.time.update_buffer(queue);
+    }
+}
+
+/// Setter functions
+impl Shady {
+    #[inline]
+    #[cfg(feature = "resolution")]
+    pub fn set_resolution(&mut self, width: u32, height: u32) {
         debug_assert!(width > 0);
         debug_assert!(height > 0);
-        self.resources.resolution.update_resolution(width, height);
+        self.resources.resolution.set(width, height);
     }
 
+    #[inline]
     #[cfg(feature = "mouse")]
-    pub fn update_mouse_input(&mut self, state: MouseState) {
-        self.resources.mouse.mouse_input(state);
+    pub fn set_mouse_state(&mut self, state: MouseState) {
+        self.resources.mouse.set_state(state);
     }
 
+    #[inline]
     #[cfg(feature = "mouse")]
-    pub fn update_cursor(&mut self, x: f32, y: f32) {
-        self.resources.mouse.cursor_moved(x, y);
+    pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
+        self.resources.mouse.set_pos(x, y);
     }
 
+    #[inline]
     #[cfg(feature = "frame")]
-    pub fn prepare_next_frame(&mut self, queue: &mut wgpu::Queue) {
-        self.resources.frame.next_frame();
-        self.resources.update_buffers(queue);
-        self.resources.audio.fetch_audio();
+    pub fn inc_frame(&mut self) {
+        self.resources.frame.inc();
+    }
+
+    #[inline]
+    #[cfg(feature = "audio")]
+    pub fn set_audio_frequency_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
+        self.resources.audio.set_frequency_range(freq_range)
+    }
+
+    #[inline]
+    #[cfg(feature = "audio")]
+    pub fn set_audio_bars(&mut self, amount_bars: NonZeroUsize) {
+        self.resources.audio.set_bars(amount_bars);
     }
 }
 

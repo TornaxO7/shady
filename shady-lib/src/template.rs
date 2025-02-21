@@ -6,7 +6,7 @@ pub enum TemplateLang {
     Glsl,
 }
 
-pub trait TemplateGenerator {
+pub(crate) trait TemplateGenerator {
     fn write_wgsl_template(
         writer: &mut dyn fmt::Write,
         bind_group_index: u32,

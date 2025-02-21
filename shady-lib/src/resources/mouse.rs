@@ -36,7 +36,7 @@ pub struct Mouse {
 
 impl Mouse {
     #[instrument(skip(self), level = "trace")]
-    pub fn cursor_moved(&mut self, x: f32, y: f32) {
+    pub fn set_pos(&mut self, x: f32, y: f32) {
         self.pos = Coord { x, y };
 
         if self.curr_state == MouseState::Pressed {
@@ -45,7 +45,7 @@ impl Mouse {
     }
 
     #[instrument(skip(self), level = "trace")]
-    pub fn mouse_input(&mut self, state: MouseState) {
+    pub fn set_state(&mut self, state: MouseState) {
         if self.curr_state == MouseState::Pressed && self.prev_state == MouseState::Released {
             self.first_click_coord = self.pos;
         }

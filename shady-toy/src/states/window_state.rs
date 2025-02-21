@@ -99,8 +99,7 @@ impl<'a> WindowState<'a> {
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.shady
-                .update_resolution(new_size.width, new_size.height);
+            self.shady.set_resolution(new_size.width, new_size.height);
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
@@ -110,7 +109,13 @@ impl<'a> WindowState<'a> {
 
 impl<'a> RenderState<'a> for WindowState<'a> {
     fn prepare_next_frame(&mut self) {
-        self.shady.prepare_next_frame(&mut self.queue);
+        self.shady.inc_frame();
+
+        self.shady.update_audio_buffer(&mut self.queue);
+        self.shady.update_frame_buffer(&mut self.queue);
+        self.shady.update_mouse_buffer(&mut self.queue);
+        self.shady.update_resolution_buffer(&mut self.queue);
+        self.shady.update_time_buffer(&mut self.queue);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {

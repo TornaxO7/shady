@@ -11,7 +11,7 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn next_frame(&mut self) {
+    pub fn inc(&mut self) {
         self.value += 1;
     }
 

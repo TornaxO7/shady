@@ -150,12 +150,12 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
             } => {
                 let shady = &mut state.shady;
                 match mouse_state {
-                    ElementState::Pressed => shady.update_mouse_input(MouseState::Pressed),
-                    ElementState::Released => shady.update_mouse_input(MouseState::Released),
+                    ElementState::Pressed => shady.set_mouse_state(MouseState::Pressed),
+                    ElementState::Released => shady.set_mouse_state(MouseState::Released),
                 }
             }
             WindowEvent::CursorMoved { position: pos, .. } => {
-                state.shady.update_cursor(pos.x as f32, pos.y as f32)
+                state.shady.set_mouse_pos(pos.x as f32, pos.y as f32)
             }
             WindowEvent::KeyboardInput { event, .. }
                 if event.logical_key.to_text() == Some("q") =>

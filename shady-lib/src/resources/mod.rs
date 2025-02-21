@@ -107,20 +107,6 @@ impl Resources {
             time: Time::new(device),
         }
     }
-
-    #[instrument(skip_all, level = "trace")]
-    pub fn update_buffers(&mut self, queue: &mut wgpu::Queue) {
-        #[cfg(feature = "audio")]
-        self.audio.update_buffer(queue);
-        #[cfg(feature = "frame")]
-        self.frame.update_buffer(queue);
-        #[cfg(feature = "mouse")]
-        self.mouse.update_buffer(queue);
-        #[cfg(feature = "resolution")]
-        self.resolution.update_buffer(queue);
-        #[cfg(feature = "time")]
-        self.time.update_buffer(queue);
-    }
 }
 
 /// Methods regarding bind groups

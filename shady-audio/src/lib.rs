@@ -210,7 +210,7 @@ impl ShadyAudio {
     /// assert!(shady_audio.update_freq_range(NonZeroU32::new(5).unwrap()..NonZeroU32::new(5).unwrap()).is_err());
     /// ```
     #[inline]
-    pub fn update_freq_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
+    pub fn set_freq_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
         if freq_range.is_empty() {
             return Err(());
         }

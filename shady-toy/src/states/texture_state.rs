@@ -122,7 +122,7 @@ impl TextureState {
 
 impl RenderState for TextureState {
     fn prepare_next_frame(&mut self) {
-        self.shady.prepare_next_frame(&mut self.queue);
+        self.shady.update_buffers(&mut self.queue);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {

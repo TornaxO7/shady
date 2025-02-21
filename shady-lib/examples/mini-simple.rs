@@ -112,7 +112,17 @@ impl<'a> State<'a> {
 
     pub fn prepare_next_frame(&mut self) {
         // SHADY
-        self.shady.prepare_next_frame(&mut self.queue);
+        //
+        // Updates the values inside the uniform buffers.
+        {
+            self.shady.inc_frame();
+
+            self.shady.update_audio_buffer(&mut self.queue);
+            self.shady.update_frame_buffer(&mut self.queue);
+            self.shady.update_mouse_buffer(&mut self.queue);
+            self.shady.update_resolution_buffer(&mut self.queue);
+            self.shady.update_time_buffer(&mut self.queue);
+        }
 
         self.surface.configure(&self.device, &self.config);
     }
@@ -141,8 +151,7 @@ impl<'a> State<'a> {
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         // SHADY
-        self.shady
-            .update_resolution(new_size.width, new_size.height);
+        self.shady.set_resolution(new_size.width, new_size.height);
     }
 }
 
