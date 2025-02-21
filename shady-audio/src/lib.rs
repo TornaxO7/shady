@@ -51,11 +51,11 @@ mod fft;
 type Hz = u32;
 
 /// The minimal frequency which humans can here (roughly)
-/// See: https://en.wikipedia.org/wiki/Hearing_range
+/// See: <https://en.wikipedia.org/wiki/Hearing_range>
 pub const MIN_HUMAN_FREQUENCY: Hz = 20;
 
 /// The maximal frequency which humans can here (roughly)
-/// See: https://en.wikipedia.org/wiki/Hearing_range
+/// See: <https://en.wikipedia.org/wiki/Hearing_range>
 pub const MAX_HUMAN_FREQUENCY: Hz = 20_000;
 
 /// The default sample rate for a fetcher.
