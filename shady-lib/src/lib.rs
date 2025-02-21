@@ -357,7 +357,7 @@ fn get_render_pipeline(
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &vertex_shader,
-            entry_point: "vertex_main",
+            entry_point: Some("vertex_main"),
             buffers: &[vertices::BUFFER_LAYOUT],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
@@ -378,7 +378,7 @@ fn get_render_pipeline(
         },
         fragment: Some(wgpu::FragmentState {
             module: &fragment_shader,
-            entry_point: "main",
+            entry_point: Some("main"),
             targets: &[Some(wgpu::ColorTargetState {
                 format: *texture_format,
                 blend: Some(wgpu::BlendState::REPLACE),

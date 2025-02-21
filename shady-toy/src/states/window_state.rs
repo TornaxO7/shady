@@ -26,7 +26,7 @@ impl<'a> WindowState<'a> {
     pub fn new(window: Window, shader_source: Option<ShaderSource>) -> Self {
         let window = Arc::new(window);
 
-        let instance = Instance::new(wgpu::InstanceDescriptor {
+        let instance = Instance::new(&wgpu::InstanceDescriptor {
             backends: Backends::PRIMARY,
             ..Default::default()
         });

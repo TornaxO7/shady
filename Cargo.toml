@@ -3,7 +3,7 @@ members = ["shady-lib", "shady-toy", "shady-audio", "shady-cli"]
 resolver = "2"
 
 [workspace.dependencies]
-wgpu = { version = "22.0", default-features = false, features = [
+wgpu = { version = "24.0", default-features = false, features = [
   "naga-ir",
   "wgsl",
   "glsl",
