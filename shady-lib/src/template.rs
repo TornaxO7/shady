@@ -1,7 +1,7 @@
 //! Module to generate templates which can be modified and used for [Shady].
 use std::fmt;
 
-use crate::{resources::Resources, FRAGMENT_ENTRYPOINT};
+use crate::{resources::Resources, BIND_GROUP_INDEX, FRAGMENT_ENTRYPOINT};
 
 /// The shader languages where the templates can be generated for.
 ///
@@ -10,35 +10,16 @@ use crate::{resources::Resources, FRAGMENT_ENTRYPOINT};
 /// use shady::TemplateLang;
 ///
 /// // Create a template in wgsl
-/// let template = TemplateLang::Wgsl { bind_group_index: 69 }
+/// let template = TemplateLang::Wgsl
 ///     .generate_to_string()
 ///     .unwrap();
 /// ```
 #[derive(Debug, Clone, Copy, Hash)]
 pub enum TemplateLang {
     /// A template in the wgsl shader language.
-    ///
-    /// - `bind_group_index`: Will be inserted in `@group(<here>)` in the fragment shader.
-    ///
-    /// # Example
-    /// If `bind_group_index` is set to `5` the template will have the following entries:
-    /// ```ignore
-    /// @group(5) @binding(...)
-    /// var<storage, read> iAudio: array<f32>;
-    ///
-    /// @group(5) @binding(...)
-    /// ...
-    /// ```
-    /// for example.
-    Wgsl { bind_group_index: u32 },
+    Wgsl,
 
     /// The glsl shader language.
-    ///
-    /// **Note:** The bindings from `0` to `k` where `k` is the amount of enabled uniform buffers
-    ///           are going to be used by [Shady]. So if you want to add even more uniform buffers
-    ///           keep that in mind!
-    ///
-    /// [Shady]: crate::Shady
     Glsl,
 }
 
@@ -59,7 +40,7 @@ impl TemplateLang {
     /// use shady::TemplateLang;
     ///
     /// // Create a template in wgsl
-    /// let template = TemplateLang::Wgsl { bind_group_index: 69 }
+    /// let template = TemplateLang::Wgsl
     ///     .generate_to_string()
     ///     .unwrap();
     /// ```
@@ -78,14 +59,14 @@ impl TemplateLang {
     /// let mut template = String::new();
     ///
     /// // Generate the template and store it into `template`.
-    /// TemplateLang::Wgsl { bind_group_index: 69 }
+    /// TemplateLang::Wgsl
     ///     .generate(&mut template)
     ///     .unwrap();
     /// ```
     pub fn generate(self, writer: &mut dyn std::fmt::Write) -> Result<(), fmt::Error> {
         match self {
-            TemplateLang::Wgsl { bind_group_index } => {
-                Resources::write_wgsl_template(writer, bind_group_index)?;
+            TemplateLang::Wgsl => {
+                Resources::write_wgsl_template(writer, BIND_GROUP_INDEX)?;
 
                 writer.write_fmt(format_args!(
                     "

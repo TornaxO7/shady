@@ -61,7 +61,7 @@ pub struct ShadyAudioConfig {
 impl ShadyAudioConfig {
     /// Checks if the current config is valid or contains any mistakes.
     ///
-    /// See [`ConfigError`] to see all possible errors.
+    /// See [`Error`] to see all possible errors.
     pub fn validate(&self) -> Result<(), Vec<Error>> {
         let mut errors = Vec::new();
 

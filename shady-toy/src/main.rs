@@ -21,8 +21,6 @@ use winit::{
     event_loop::{ControlFlow, EventLoop, EventLoopProxy},
 };
 
-const SHADY_BIND_GROUP_INDEX: u32 = 0;
-
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("File does not exist")]
@@ -126,10 +124,7 @@ fn add_template_to_file(path: &Path) -> Result<(), Error> {
     let frontend = ShaderLanguage::try_from(path).map_err(Error::UnknownShaderFileExtension)?;
 
     let template = match frontend {
-        ShaderLanguage::Wgsl => TemplateLang::Wgsl {
-            bind_group_index: SHADY_BIND_GROUP_INDEX,
-        }
-        .generate_to_string(),
+        ShaderLanguage::Wgsl => TemplateLang::Wgsl.generate_to_string(),
         ShaderLanguage::Glsl => TemplateLang::Glsl.generate_to_string(),
     }
     .expect("Write template to given path");

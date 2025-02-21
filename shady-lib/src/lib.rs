@@ -16,60 +16,10 @@
 //! Each resource is behind a feature gate so if you don't want to use some of them, just disable their feature gate.
 //!
 //! # Example
-//! An (mini) example can be seen here: <https://github.com/TornaxO7/shady/blob/main/shady-lib/examples/mini-simple.rs>
+//! An "mini" example can be seen here: <https://github.com/TornaxO7/shady/blob/main/shady-lib/examples/mini-simple.rs>
+//! I tried to make it as small as possible.
 //!
-//! But here's a rough structure how it's meant to be used:
-//!
-//! ```ignore
-//! use shady::{Shady, ShadyDescriptor};
-//!
-//! struct State {
-//!     shady: Shady,
-//!
-//!     // ... and your other wgpu stuff, like `wgpu::Device`, etc.
-//!     queue: wgpu::Queue,
-//!     device: wgpu::Device,
-//! }
-//!
-//! impl State {
-//!     pub fn new() -> Self {
-//!         // .. your stuff
-//!
-//!         let shady = Shady::new(ShadyDescriptor {
-//!             // ... set the attributes
-//!         });
-//!
-//!         // ...
-//!     }
-//!
-//!     pub fn prepare_next_frame(&mut self) {
-//!         // here you can change some properties of shady or change
-//!         // the values of the uniform buffers of the fragment shader
-//!         self.shady.inc_frame();
-//!
-//!         // ... afterwards tell shady to move the values into the uniform buffer
-//!         self.shady.update_frame_buffer(&mut self.queue);
-//!         // ... and other buffers you'd like to update
-//!     }
-//!
-//!     pub fn render(&mut self) {
-//!         // ...
-//!
-//!         let view = ...;
-//!         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-//!            label: Some("Some random encoder"),
-//!         });
-//!
-//!         // shady will add a render pass and you are good to go!
-//!         self.shady.add_render_pass(&mut encoder, &view);
-//!     }
-//!
-//!     pub fn load_fragment_code<'a>(&mut self, shader_source: wgpu::ShaderSource<'a>) {
-//!         // set the render pipeline which should execute the given fragment code
-//!         self.shady.set_render_pipeline(&self.device, shader_source);
-//!     }
-//! }
-//! ```
+//! Just search after the string `SHADY` within the file and you'll see what you can/need to do to include it into your renderer.
 //!
 //! [shadertoy]: https://www.shadertoy.com/
 //! [wgpu]: https://crates.io/crates/wgpu
@@ -83,7 +33,7 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::Range,
 };
-use tracing::{debug, instrument};
+use tracing::instrument;
 use wgpu::{CommandEncoder, Device, ShaderSource, TextureView};
 
 pub use descriptor::ShadyDescriptor;
@@ -98,6 +48,13 @@ pub use template::TemplateLang;
 /// The name of the entrypoint function of the fragment shader for `shady`.
 pub const FRAGMENT_ENTRYPOINT: &str = "main";
 
+const BIND_GROUP_INDEX: u32 = 0;
+const VBUFFER_INDEX: u32 = 0;
+
+/// A wrapper around [wgpu::RenderPipeline].
+#[derive(Debug, Clone)]
+pub struct ShadyRenderPipeline(wgpu::RenderPipeline);
+
 /// The main struct of this crate.
 ///
 /// # Example
@@ -109,12 +66,6 @@ pub struct Shady {
     resources: Resources,
     bind_group: wgpu::BindGroup,
 
-    pipeline: Option<wgpu::RenderPipeline>,
-    bind_group_index: u32,
-    vbuffer_index: u32,
-
-    texture_format: wgpu::TextureFormat,
-
     vbuffer: wgpu::Buffer,
     ibuffer: wgpu::Buffer,
 }
@@ -124,79 +75,45 @@ impl Shady {
     /// Create a new instance of `Shady`.
     #[instrument(level = "trace")]
     pub fn new<'a>(desc: ShadyDescriptor) -> Self {
-        let ShadyDescriptor {
-            device,
-            initial_fragment_shader,
-            texture_format,
-            bind_group_index,
-            vertex_buffer_index,
-        } = desc;
+        let ShadyDescriptor { device } = desc;
 
         let resources = Resources::new(device);
 
         let bind_group = resources.bind_group(device);
 
-        let pipeline = initial_fragment_shader.map(|shader| {
-            let bind_group_layout = Resources::bind_group_layout(device);
-
-            get_render_pipeline(device, shader, bind_group_layout, &texture_format)
-        });
-
         Self {
             resources,
             bind_group,
-            pipeline,
-            texture_format,
-            bind_group_index,
-            vbuffer_index: vertex_buffer_index,
             vbuffer: vertices::vertex_buffer(device),
             ibuffer: vertices::index_buffer(device),
         }
     }
 
     /// Add a render pass to the given `encoder` and `texture_view`.
-    pub fn add_render_pass(&self, encoder: &mut CommandEncoder, texture_view: &TextureView) {
-        if let Some(pipeline) = &self.pipeline {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: texture_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                ..Default::default()
-            });
+    pub fn add_render_pass(
+        &self,
+        encoder: &mut CommandEncoder,
+        texture_view: &TextureView,
+        shady_pipeline: &ShadyRenderPipeline,
+    ) {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: texture_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            ..Default::default()
+        });
 
-            render_pass.set_pipeline(pipeline);
-            render_pass.set_bind_group(self.bind_group_index, &self.bind_group, &[]);
-            render_pass.set_vertex_buffer(self.vbuffer_index, self.vbuffer.slice(..));
-            render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(vertices::index_buffer_range(), 0, 0..1);
-
-            debug!("Applied renderpass");
-        } else {
-            debug!("Pipeline not set!");
-        }
-    }
-
-    /// Sets/Updates the render pipeline of [Shady].
-    /// Is especially used if you'd like to display a different fragment shader with [Shady].
-    /// To get a fragment shader which [Shady] will be able to use see [TemplateLang].
-    #[instrument(skip(self, device), level = "trace")]
-    pub fn set_render_pipeline<'a>(&mut self, device: &Device, shader_source: ShaderSource<'a>) {
-        #[cfg(feature = "frame")]
-        self.resources.frame.reset_counter();
-        let bind_group_layout = Resources::bind_group_layout(device);
-
-        self.pipeline = Some(get_render_pipeline(
-            device,
-            shader_source,
-            bind_group_layout,
-            &self.texture_format,
-        ));
+        render_pass.set_pipeline(&shady_pipeline.0);
+        render_pass.set_bind_group(BIND_GROUP_INDEX, &self.bind_group, &[]);
+        render_pass.set_vertex_buffer(VBUFFER_INDEX, self.vbuffer.slice(..));
+        render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(vertices::index_buffer_range(), 0, 0..1);
     }
 }
 
@@ -328,6 +245,18 @@ impl Shady {
     pub fn update_time_buffer(&mut self, queue: &mut wgpu::Queue) {
         self.resources.time.update_buffer(queue);
     }
+}
+
+/// Creates a pre-configured pipeline which can then be used in [Shady::add_render_pass].
+pub fn create_render_pipeline<'a>(
+    device: &Device,
+    shader_source: ShaderSource<'a>,
+    texture_format: &'a wgpu::TextureFormat,
+) -> ShadyRenderPipeline {
+    let bind_group_layout = Resources::bind_group_layout(device);
+    let pipeline = get_render_pipeline(device, shader_source, bind_group_layout, texture_format);
+
+    ShadyRenderPipeline(pipeline)
 }
 
 fn get_render_pipeline(

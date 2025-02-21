@@ -1,13 +1,13 @@
 use image::{ImageBuffer, Rgba};
 use pollster::FutureExt;
-use shady::{Shady, ShadyDescriptor};
+use shady::{Shady, ShadyDescriptor, ShadyRenderPipeline};
 use wgpu::{
     Backends, Buffer, BufferView, Device, DeviceDescriptor, Extent3d, Instance, Queue,
     ShaderSource, Texture,
 };
 use winit::dpi::PhysicalSize;
 
-use crate::states::{RenderState, SHADY_BIND_GROUP_INDEX, SHADY_VERTEX_BUFFER_INDEX};
+use crate::states::RenderState;
 
 type Bytes = u32;
 
@@ -24,6 +24,7 @@ pub struct TextureState {
     device: Device,
     queue: Queue,
     shady: Shady,
+    pipeline: Option<ShadyRenderPipeline>,
 }
 
 impl TextureState {
@@ -54,7 +55,7 @@ impl TextureState {
             MIN_BYTES_WIDTH / OUTPUT_BUFFER_VALUE_SIZE
         );
 
-        let instance = Instance::new(wgpu::InstanceDescriptor {
+        let instance = Instance::new(&wgpu::InstanceDescriptor {
             backends: Backends::PRIMARY,
             ..Default::default()
         });
@@ -100,13 +101,10 @@ impl TextureState {
             view_formats: &[],
         });
 
-        let shady = Shady::new(ShadyDescriptor {
-            device: &device,
-            initial_fragment_shader: shader_source,
-            texture_format,
-            bind_group_index: SHADY_BIND_GROUP_INDEX,
-            vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
-        });
+        let pipeline = shader_source
+            .map(|source| shady::create_render_pipeline(&device, source, &texture_format));
+
+        let shady = Shady::new(ShadyDescriptor { device: &device });
 
         Self {
             size: texture_size,
@@ -116,6 +114,7 @@ impl TextureState {
             queue,
             shady,
             output_buffer,
+            pipeline,
         }
     }
 }
@@ -132,43 +131,50 @@ impl<'a> RenderState<'a> for TextureState {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let texture_view = self
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        if let Some(pipeline) = &self.pipeline {
+            let texture_view = self
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Shady texture command encoder"),
-            });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Shady texture command encoder"),
+                });
 
-        self.shady.add_render_pass(&mut encoder, &texture_view);
+            self.shady
+                .add_render_pass(&mut encoder, &texture_view, pipeline);
 
-        encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
-                aspect: wgpu::TextureAspect::All,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                texture: &self.texture,
-            },
-            wgpu::ImageCopyBuffer {
-                buffer: &self.output_buffer,
-                layout: wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(std::mem::size_of::<u32>() as u32 * self.size.width),
-                    rows_per_image: Some(self.size.height),
+            encoder.copy_texture_to_buffer(
+                wgpu::TexelCopyTextureInfo {
+                    aspect: wgpu::TextureAspect::All,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    texture: &self.texture,
                 },
-            },
-            self.texture_extent,
-        );
+                wgpu::TexelCopyBufferInfo {
+                    buffer: &self.output_buffer,
+                    layout: wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(std::mem::size_of::<u32>() as u32 * self.size.width),
+                        rows_per_image: Some(self.size.height),
+                    },
+                },
+                self.texture_extent,
+            );
 
-        self.queue.submit(std::iter::once(encoder.finish()));
+            self.queue.submit(std::iter::once(encoder.finish()));
+        }
 
         Ok(())
     }
 
     fn update_pipeline(&mut self, shader_source: ShaderSource<'a>) {
-        self.shady.set_render_pipeline(&self.device, shader_source)
+        self.pipeline = Some(shady::create_render_pipeline(
+            &self.device,
+            shader_source,
+            &self.texture.format(),
+        ));
     }
 }
 

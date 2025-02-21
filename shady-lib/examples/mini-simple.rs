@@ -2,7 +2,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use pollster::FutureExt;
-use shady::{Shady, ShadyDescriptor};
+use shady::{Shady, ShadyDescriptor, ShadyRenderPipeline};
 use wgpu::{
     Backends, Device, Instance, Queue, ShaderSource, Surface, SurfaceConfiguration,
     TextureViewDescriptor,
@@ -15,9 +15,6 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
-const SHADY_BIND_GROUP_INDEX: u32 = 0;
-const SHADY_VERTEX_BUFFER_INDEX: u32 = 0;
-
 struct State<'a> {
     surface: Surface<'a>,
     device: Device,
@@ -26,13 +23,15 @@ struct State<'a> {
     window: Arc<Window>,
     // SHADY
     shady: Shady,
+    // SHADY
+    pipeline: ShadyRenderPipeline,
 }
 
 impl<'a> State<'a> {
     fn new(window: Window) -> Self {
         let window = Arc::new(window);
 
-        let instance = Instance::new(wgpu::InstanceDescriptor {
+        let instance = Instance::new(&wgpu::InstanceDescriptor {
             backends: Backends::PRIMARY,
             ..Default::default()
         });
@@ -52,7 +51,7 @@ impl<'a> State<'a> {
             .block_on()
             .unwrap();
 
-        let (config, shady) = {
+        let config = {
             let surface_caps = surface.get_capabilities(&adapter);
             let surface_format = surface_caps
                 .formats
@@ -74,28 +73,24 @@ impl<'a> State<'a> {
                 desired_maximum_frame_latency: 2,
             };
 
-            // SHADY
+            config
+        };
+
+        // SHADY
+        //
+        // Create the render pipeline which shady will use.
+        let pipeline = {
             let fragment_shader = {
-                let template = shady::TemplateLang::Wgsl {
-                    bind_group_index: 0,
-                }
-                .generate_to_string()
-                .unwrap();
+                let template = shady::TemplateLang::Wgsl.generate_to_string().unwrap();
 
                 ShaderSource::Wgsl(Cow::Owned(template))
             };
 
-            // SHADY
-            let shady = Shady::new(ShadyDescriptor {
-                device: &device,
-                initial_fragment_shader: Some(fragment_shader),
-                texture_format: surface_format,
-                bind_group_index: SHADY_BIND_GROUP_INDEX,
-                vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
-            });
-
-            (config, shady)
+            shady::create_render_pipeline(&device, fragment_shader, &config.format)
         };
+
+        // SHADY
+        let shady = Shady::new(ShadyDescriptor { device: &device });
 
         Self {
             surface,
@@ -104,6 +99,7 @@ impl<'a> State<'a> {
             config,
             window,
             shady,
+            pipeline,
         }
     }
 
@@ -124,13 +120,6 @@ impl<'a> State<'a> {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn _change_fragment_code(&mut self, source: ShaderSource<'a>) {
-        // SHADY
-        //
-        // Tell shady to use a new/other fragment code to render it.
-        self.shady.set_render_pipeline(&self.device, source);
-    }
-
     pub fn render(&mut self) {
         let output = self.surface.get_current_texture().unwrap();
         let view = output
@@ -143,7 +132,11 @@ impl<'a> State<'a> {
                 label: Some("Render encoder"),
             });
 
-        self.shady.add_render_pass(&mut encoder, &view);
+        // SHADY
+        //
+        // Add the render pass to the encoder to draw the next frame.
+        self.shady
+            .add_render_pass(&mut encoder, &view, &self.pipeline);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
@@ -155,6 +148,11 @@ impl<'a> State<'a> {
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         // SHADY
+        //
+        // Update any properties of shady.
+        // Note: You need to call the appropriate `update_*_buffer` method to write
+        // the new values into the buffers for the next frame you use shady otherwise the previous values in the
+        // buffer will be used.
         self.shady.set_resolution(new_size.width, new_size.height);
     }
 }

@@ -9,8 +9,6 @@ use wgpu::{
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
-use super::{SHADY_BIND_GROUP_INDEX, SHADY_VERTEX_BUFFER_INDEX};
-
 use super::RenderState;
 
 pub struct WindowState<'a> {
@@ -18,6 +16,7 @@ pub struct WindowState<'a> {
     device: Device,
     queue: Queue,
     config: SurfaceConfiguration,
+    pipeline: Option<shady::ShadyRenderPipeline>,
     window: Arc<Window>,
     pub shady: Shady,
 }
@@ -48,7 +47,7 @@ impl<'a> WindowState<'a> {
             .block_on()
             .expect("Retrieve device and queue");
 
-        let (config, shady) = {
+        let (config, shady, pipeline) = {
             let surface_caps = surface.get_capabilities(&adapter);
             let surface_format = surface_caps
                 .formats
@@ -70,15 +69,12 @@ impl<'a> WindowState<'a> {
                 desired_maximum_frame_latency: 2,
             };
 
-            let shady = Shady::new(ShadyDescriptor {
-                device: &device,
-                initial_fragment_shader: shader_source,
-                texture_format: surface_format,
-                bind_group_index: SHADY_BIND_GROUP_INDEX,
-                vertex_buffer_index: SHADY_VERTEX_BUFFER_INDEX,
-            });
+            let pipeline = shader_source
+                .map(|source| shady::create_render_pipeline(&device, source, &surface_format));
 
-            (config, shady)
+            let shady = Shady::new(ShadyDescriptor { device: &device });
+
+            (config, shady, pipeline)
         };
 
         surface.configure(&device, &config);
@@ -90,6 +86,7 @@ impl<'a> WindowState<'a> {
             config,
             window,
             shady,
+            pipeline,
         }
     }
 
@@ -119,27 +116,33 @@ impl<'a> RenderState<'a> for WindowState<'a> {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&TextureViewDescriptor::default());
+        if let Some(pipeline) = &self.pipeline {
+            let output = self.surface.get_current_texture()?;
+            let view = output
+                .texture
+                .create_view(&TextureViewDescriptor::default());
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("WindowState render encoder"),
-            });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("WindowState render encoder"),
+                });
 
-        self.shady.add_render_pass(&mut encoder, &view);
+            self.shady.add_render_pass(&mut encoder, &view, &pipeline);
 
-        self.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
+            self.queue.submit(std::iter::once(encoder.finish()));
+            output.present();
+        }
 
         Ok(())
     }
 
     #[instrument(skip_all)]
     fn update_pipeline(&mut self, shader_source: ShaderSource<'a>) {
-        self.shady.set_render_pipeline(&self.device, shader_source);
+        self.pipeline = Some(shady::create_render_pipeline(
+            &self.device,
+            shader_source,
+            &self.config.format,
+        ));
     }
 }

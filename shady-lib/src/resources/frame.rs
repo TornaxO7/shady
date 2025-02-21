@@ -14,10 +14,6 @@ impl Frame {
     pub fn inc(&mut self) {
         self.value += 1;
     }
-
-    pub fn reset_counter(&mut self) {
-        self.value = 0;
-    }
 }
 
 impl Resource for Frame {
