@@ -4,7 +4,11 @@ use std::{
     ops::Range,
 };
 
-use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
+use shady_audio::{
+    config::ShadyAudioConfig,
+    fetcher::{Fetcher, SystemAudioFetcher},
+    ShadyAudio,
+};
 use wgpu::Device;
 
 use crate::template::TemplateGenerator;
@@ -38,6 +42,10 @@ impl Audio {
 
     pub fn set_frequency_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
         self.shady_audio.set_freq_range(freq_range)
+    }
+
+    pub fn set_fetcher(&mut self, fecther: Box<dyn Fetcher>) {
+        self.shady_audio.set_fetcher(fetcher);
     }
 }
 

@@ -76,6 +76,7 @@ mod template;
 mod vertices;
 
 use resources::{Resource, Resources};
+use shady_audio::fetcher::Fetcher;
 use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::Range,
@@ -94,6 +95,12 @@ pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOU
 pub const FRAGMENT_ENTRYPOINT: &str = "main";
 
 /// The main struct of this crate.
+///
+/// # Example
+/// It's recommended to take a look into the [mini-simple.rs] example to understand its usage and methods.
+/// Open the search of your web-browser and enter `SHADY`. Those are the places where you could use the struct.
+///
+/// [mini-simple.rs]: https://github.com/TornaxO7/shady/blob/main/shady-lib/examples/mini-simple.rs
 pub struct Shady {
     resources: Resources,
     bind_group: wgpu::BindGroup,
@@ -143,6 +150,7 @@ impl Shady {
         }
     }
 
+    /// Add a render pass to the given `encoder` and `texture_view`.
     pub fn add_render_pass(&self, encoder: &mut CommandEncoder, texture_view: &TextureView) {
         if let Some(pipeline) = &self.pipeline {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -170,6 +178,9 @@ impl Shady {
         }
     }
 
+    /// Sets/Updates the render pipeline of [Shady].
+    /// Is especially used if you'd like to display a different fragment shader with [Shady].
+    /// To get a fragment shader which [Shady] will be able to use see [TemplateLang].
     #[instrument(skip(self, device), level = "trace")]
     pub fn set_render_pipeline<'a>(&mut self, device: &Device, shader_source: ShaderSource<'a>) {
         #[cfg(feature = "frame")]
@@ -185,42 +196,25 @@ impl Shady {
     }
 }
 
-/// Update buffer functions
+/// Methods to set/change some values in [Shady]'s internal stage which will be then written
+/// into the uniform buffer after calling their responsible `update_*` function.
+///
+/// # Example
+/// ```ignore
+/// let mut shady = Shady::new(...);
+///
+/// // let's assume the surface has changed.
+/// // Tell that shady:
+/// shady.set_resolution(100, 200);
+///
+/// // now write that new resolution into the `iResolution` uniform buffer
+/// shady.update_resolution_buffer(...);
+/// ```
 impl Shady {
-    #[inline]
-    #[cfg(feature = "audio")]
-    pub fn update_audio_buffer(&mut self, queue: &mut wgpu::Queue) {
-        self.resources.audio.fetch_audio();
-        self.resources.audio.update_buffer(queue);
-    }
-
-    #[inline]
-    #[cfg(feature = "frame")]
-    pub fn update_frame_buffer(&mut self, queue: &mut wgpu::Queue) {
-        self.resources.frame.update_buffer(queue);
-    }
-
-    #[inline]
-    #[cfg(feature = "mouse")]
-    pub fn update_mouse_buffer(&mut self, queue: &mut wgpu::Queue) {
-        self.resources.mouse.update_buffer(queue);
-    }
-
-    #[inline]
-    #[cfg(feature = "resolution")]
-    pub fn update_resolution_buffer(&mut self, queue: &mut wgpu::Queue) {
-        self.resources.resolution.update_buffer(queue);
-    }
-
-    #[inline]
-    #[cfg(feature = "time")]
-    pub fn update_time_buffer(&mut self, queue: &mut wgpu::Queue) {
-        self.resources.time.update_buffer(queue);
-    }
-}
-
-/// Setter functions
-impl Shady {
+    /// Set the resolution of the output screen.
+    ///
+    /// # Affected uniform buffer
+    /// `iResolution`
     #[inline]
     #[cfg(feature = "resolution")]
     pub fn set_resolution(&mut self, width: u32, height: u32) {
@@ -229,34 +223,101 @@ impl Shady {
         self.resources.resolution.set(width, height);
     }
 
+    /// Set the mouse state.
+    ///
+    /// # Affected uniform buffer
+    /// `iMouse`
     #[inline]
     #[cfg(feature = "mouse")]
     pub fn set_mouse_state(&mut self, state: MouseState) {
         self.resources.mouse.set_state(state);
     }
 
+    /// Set the mouse position.
+    ///
+    /// # Affected uniform buffer
+    /// `iMouse`
     #[inline]
     #[cfg(feature = "mouse")]
     pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
         self.resources.mouse.set_pos(x, y);
     }
 
+    /// Increment the frame counter.
+    ///
+    /// # Affected uniform buffer
+    /// `iFrame`
     #[inline]
     #[cfg(feature = "frame")]
     pub fn inc_frame(&mut self) {
         self.resources.frame.inc();
     }
 
+    /// Set the frequency range which [Shady] should listen to from the sample fetcher.
+    ///
+    /// # Affected uniform buffer
+    /// `iAudio`
     #[inline]
     #[cfg(feature = "audio")]
     pub fn set_audio_frequency_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
         self.resources.audio.set_frequency_range(freq_range)
     }
 
+    /// Sets the amount of bar-values.
+    ///
+    /// # Affected uniform buffer
+    /// `iAudio`
     #[inline]
     #[cfg(feature = "audio")]
     pub fn set_audio_bars(&mut self, amount_bars: NonZeroUsize) {
         self.resources.audio.set_bars(amount_bars);
+    }
+
+    /// Set the audio fetcher which [Shady] should use.
+    ///
+    /// # Affected uniform buffer
+    /// `iAudio`
+    pub fn set_audio_fetcher(&mut self, fetcher: Box<dyn Fetcher>) {
+        self.resources.audio.set_fetcher(fetcher);
+    }
+}
+
+/// Methods to overwrite/update the responding uniform buffer for the next time you render a frame with [Shady].
+impl Shady {
+    /// Updates the `iAudio` uniform buffer with new values.
+    #[inline]
+    #[cfg(feature = "audio")]
+    pub fn update_audio_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.audio.fetch_audio();
+        self.resources.audio.update_buffer(queue);
+    }
+
+    /// Updates the `iFrame` uniform buffer with new values.
+    #[inline]
+    #[cfg(feature = "frame")]
+    pub fn update_frame_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.frame.update_buffer(queue);
+    }
+
+    /// Updates the `iMouse` uniform buffer with new values.
+    #[inline]
+    #[cfg(feature = "mouse")]
+    pub fn update_mouse_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.mouse.update_buffer(queue);
+    }
+
+    /// Updates the `iResolution` uniform buffer with new values.
+    #[inline]
+    #[cfg(feature = "resolution")]
+    pub fn update_resolution_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.resolution.update_buffer(queue);
+    }
+
+    /// Updates the `iTime` uniform buffer with new values.
+    #[inline]
+    #[cfg(feature = "time")]
+    pub fn update_time_buffer(&mut self, queue: &mut wgpu::Queue) {
+        self.resources.time.update_buffer(queue);
     }
 }
 
