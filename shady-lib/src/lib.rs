@@ -79,7 +79,6 @@ mod template;
 mod vertices;
 
 use resources::{Resource, Resources};
-use shady_audio::fetcher::Fetcher;
 use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::Range,
@@ -88,6 +87,9 @@ use tracing::{debug, instrument};
 use wgpu::{CommandEncoder, Device, ShaderSource, TextureView};
 
 pub use descriptor::ShadyDescriptor;
+
+#[cfg(feature = "audio")]
+pub use shady_audio;
 
 #[cfg(feature = "mouse")]
 pub use resources::MouseState;
@@ -282,7 +284,9 @@ impl Shady {
     ///
     /// # Affected uniform buffer
     /// `iAudio`
-    pub fn set_audio_fetcher(&mut self, fetcher: Box<dyn Fetcher>) {
+    #[inline]
+    #[cfg(feature = "audio")]
+    pub fn set_audio_fetcher(&mut self, fetcher: Box<dyn shady_audio::fetcher::Fetcher>) {
         self.resources.audio.set_fetcher(fetcher);
     }
 }
