@@ -81,7 +81,7 @@ pub enum Error {
     ///
     /// # Example
     /// ```rust
-    /// use shady_audio::config::{ShadyAudioConfig, ConfigError};
+    /// use shady_audio::{Error, config::ShadyAudioConfig};
     /// use std::num::NonZeroU32;
     ///
     /// let invalid_range = NonZeroU32::new(10).unwrap()..NonZeroU32::new(10).unwrap();
