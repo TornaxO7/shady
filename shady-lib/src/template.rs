@@ -37,6 +37,8 @@ pub enum TemplateLang {
     /// **Note:** The bindings from `0` to `k` where `k` is the amount of enabled uniform buffers
     ///           are going to be used by [Shady]. So if you want to add even more uniform buffers
     ///           keep that in mind!
+    ///
+    /// [Shady]: crate::Shady
     Glsl,
 }
 
