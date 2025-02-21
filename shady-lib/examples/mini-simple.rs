@@ -76,16 +76,13 @@ impl<'a> State<'a> {
 
             // SHADY
             let fragment_shader = {
-                let mut fragment_code = String::new();
-                shady::get_template(
-                    shady::TemplateLang::Wgsl {
-                        bind_group_index: 0,
-                    },
-                    &mut fragment_code,
-                )
+                let template = shady::TemplateLang::Wgsl {
+                    bind_group_index: 0,
+                }
+                .generate_to_string()
                 .unwrap();
 
-                ShaderSource::Wgsl(Cow::Owned(fragment_code))
+                ShaderSource::Wgsl(Cow::Owned(template))
             };
 
             // SHADY

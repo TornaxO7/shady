@@ -1,6 +1,6 @@
 use image::{ImageBuffer, Rgba};
 use pollster::FutureExt;
-use shady::{Shady, ShadyDescriptor, Wgsl};
+use shady::{Shady, ShadyDescriptor};
 use wgpu::{
     Backends, Buffer, BufferView, Device, DeviceDescriptor, Extent3d, Instance, Queue,
     ShaderSource, Texture,
@@ -120,9 +120,15 @@ impl TextureState {
     }
 }
 
-impl RenderState for TextureState {
+impl<'a> RenderState<'a> for TextureState {
     fn prepare_next_frame(&mut self) {
-        self.shady.update_buffers(&mut self.queue);
+        self.shady.inc_frame();
+
+        self.shady.update_audio_buffer(&mut self.queue);
+        self.shady.update_frame_buffer(&mut self.queue);
+        self.shady.update_mouse_buffer(&mut self.queue);
+        self.shady.update_resolution_buffer(&mut self.queue);
+        self.shady.update_time_buffer(&mut self.queue);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -161,7 +167,7 @@ impl RenderState for TextureState {
         Ok(())
     }
 
-    fn update_pipeline<'a>(&mut self, shader_source: ShaderSource<'a>) {
+    fn update_pipeline(&mut self, shader_source: ShaderSource<'a>) {
         self.shady
             .update_render_pipeline(&self.device, shader_source)
     }

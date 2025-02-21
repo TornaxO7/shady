@@ -204,10 +204,10 @@ impl ShadyAudio {
     /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default()).unwrap();
     ///
     /// // tell `shady-audio` to just create the bars for the frequencies from 1kHz to 15kHz.
-    /// shady_audio.update_freq_range(NonZeroU32::new(1_000).unwrap()..NonZeroU32::new(15_000).unwrap()).unwrap();
+    /// shady_audio.set_freq_range(NonZeroU32::new(1_000).unwrap()..NonZeroU32::new(15_000).unwrap()).unwrap();
     ///
     /// // empty ranges are not allowed!
-    /// assert!(shady_audio.update_freq_range(NonZeroU32::new(5).unwrap()..NonZeroU32::new(5).unwrap()).is_err());
+    /// assert!(shady_audio.set_freq_range(NonZeroU32::new(5).unwrap()..NonZeroU32::new(5).unwrap()).is_err());
     /// ```
     #[inline]
     pub fn set_freq_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
