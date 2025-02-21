@@ -20,10 +20,10 @@ struct Coord {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseState {
-    /// Means the mouse was released.
+    /// Means the mouse is released.
     Released,
 
-    /// Means the mouse was pressed.
+    /// Means the mouse is pressed.
     Pressed,
 }
 

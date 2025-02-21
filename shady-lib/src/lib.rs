@@ -89,7 +89,6 @@ pub use descriptor::ShadyDescriptor;
 #[cfg(feature = "mouse")]
 pub use resources::MouseState;
 pub use template::TemplateLang;
-pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
 
 /// The name of the entrypoint function of the fragment shader for `shady`.
 pub const FRAGMENT_ENTRYPOINT: &str = "main";
@@ -170,7 +169,7 @@ impl Shady {
             render_pass.set_bind_group(self.bind_group_index, &self.bind_group, &[]);
             render_pass.set_vertex_buffer(self.vbuffer_index, self.vbuffer.slice(..));
             render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(crate::index_buffer_range(), 0, 0..1);
+            render_pass.draw_indexed(vertices::index_buffer_range(), 0, 0..1);
 
             debug!("Applied renderpass");
         } else {

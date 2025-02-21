@@ -25,6 +25,7 @@ pub const INDICES: &[u16] = &[
     0, 2, 3,
 ];
 
+/// Constains the vertex buffer layout for the vertex buffer for the shaders of `Shady`.
 pub const BUFFER_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
     array_stride: std::mem::size_of::<VertexCoord>() as wgpu::BufferAddress,
     step_mode: wgpu::VertexStepMode::Vertex,

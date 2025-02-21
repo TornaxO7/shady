@@ -44,7 +44,7 @@ impl Audio {
         self.shady_audio.set_freq_range(freq_range)
     }
 
-    pub fn set_fetcher(&mut self, fecther: Box<dyn Fetcher>) {
+    pub fn set_fetcher(&mut self, fetcher: Box<dyn Fetcher>) {
         self.shady_audio.set_fetcher(fetcher);
     }
 }
