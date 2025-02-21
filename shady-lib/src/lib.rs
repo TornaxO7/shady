@@ -5,11 +5,9 @@ mod vertices;
 
 use resources::{Resource, Resources};
 use std::{
-    fmt,
     num::{NonZeroU32, NonZeroUsize},
     ops::Range,
 };
-use template::TemplateGenerator;
 use tracing::{debug, instrument};
 use wgpu::{CommandEncoder, Device, ShaderSource, TextureView};
 
@@ -248,53 +246,4 @@ fn get_render_pipeline<'a>(
     });
 
     pipeline
-}
-
-pub fn get_template(
-    lang: TemplateLang,
-    writer: &mut dyn std::fmt::Write,
-) -> Result<(), fmt::Error> {
-    match lang {
-        TemplateLang::Wgsl { bind_group_index } => {
-            Resources::write_wgsl_template(writer, bind_group_index)?;
-
-            writer.write_fmt(format_args!(
-                "
-@fragment
-fn {}(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {{
-    let uv = pos.xy/iResolution.xy;
-    let col = 0.5 + 0.5 * cos(iTime + uv.xyx + vec3<f32>(0.0, 2.0, 4.0));
-
-    return vec4<f32>(col, 1.0);
-}}
-",
-                FRAGMENT_ENTRYPOINT
-            ))?;
-        }
-
-        TemplateLang::Glsl => {
-            Resources::write_glsl_template(writer)?;
-
-            writer.write_fmt(format_args!(
-                "
-// the color which the pixel should have
-layout(location = 0) out vec4 fragColor;
-
-void {}() {{
-    // Normalized pixel coordinates (from 0 to 1)
-    vec2 uv = gl_FragCoord.xy/iResolution.xy;
-
-    // Time varying pixel color
-    vec3 col = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
-
-    // Output to screen
-    fragColor = vec4(col,1.0);      
-}}
-",
-                FRAGMENT_ENTRYPOINT
-            ))?;
-        }
-    };
-
-    Ok(())
 }

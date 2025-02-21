@@ -14,6 +14,7 @@ use ariadne::Fmt;
 use frontend::ShaderLanguage;
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use renderer::Renderer;
+use shady::TemplateLang;
 use tracing::{debug, debug_span};
 use winit::{
     error::EventLoopError,
@@ -124,16 +125,12 @@ fn watch_shader_file<P: AsRef<Path>>(path: P, proxy: Arc<EventLoopProxy<UserEven
 fn add_template_to_file(path: &Path) -> Result<(), Error> {
     let frontend = ShaderLanguage::try_from(path).map_err(Error::UnknownShaderFileExtension)?;
 
-    let mut template = String::new();
-
-    match frontend {
-        ShaderLanguage::Wgsl => shady::get_template(
-            shady::TemplateLang::Wgsl {
-                bind_group_index: SHADY_BIND_GROUP_INDEX,
-            },
-            &mut template,
-        ),
-        ShaderLanguage::Glsl => shady::get_template(shady::TemplateLang::Glsl, &mut template),
+    let template = match frontend {
+        ShaderLanguage::Wgsl => TemplateLang::Wgsl {
+            bind_group_index: SHADY_BIND_GROUP_INDEX,
+        }
+        .generate_to_string(),
+        ShaderLanguage::Glsl => TemplateLang::Glsl.generate_to_string(),
     }
     .expect("Write template to given path");
 
