@@ -64,7 +64,7 @@ pub const DEFAULT_SAMPLE_RATE: SampleRate = SampleRate(44_100);
 
 pub use cpal;
 
-use config::{ConfigError, ShadyAudioConfig};
+use config::ShadyAudioConfig;
 use cpal::SampleRate;
 use equalizer::Equalizer;
 use fetcher::Fetcher;
@@ -73,6 +73,31 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::Range,
 };
+
+/// Contains all possible errors/issues with [ShadyAudio].
+#[derive(thiserror::Error, Debug, Clone)]
+pub enum Error {
+    /// Occurs, if you've set [`ShadyAudioConfig::freq_range`] to an empty range.
+    ///
+    /// # Example
+    /// ```rust
+    /// use shady_audio::config::{ShadyAudioConfig, ConfigError};
+    /// use std::num::NonZeroU32;
+    ///
+    /// let invalid_range = NonZeroU32::new(10).unwrap()..NonZeroU32::new(10).unwrap();
+    /// assert!(invalid_range.is_empty(), "`start` and `end` are equal");
+    ///
+    /// let config = ShadyAudioConfig {
+    ///     freq_range: invalid_range.clone(),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// // the range isn't allowed to be empty!
+    /// assert!(config.validate().is_err());
+    /// ```
+    #[error("Frequency range can't be empty but you gave: {0:?}")]
+    EmptyFreqRange(Range<NonZeroU32>),
+}
 
 struct State {
     amount_bars: usize,
@@ -100,10 +125,7 @@ impl ShadyAudio {
     ///
     /// let shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
     /// ```
-    pub fn new(
-        fetcher: Box<dyn Fetcher>,
-        config: ShadyAudioConfig,
-    ) -> Result<Self, Vec<ConfigError>> {
+    pub fn new(fetcher: Box<dyn Fetcher>, config: ShadyAudioConfig) -> Result<Self, Vec<Error>> {
         config.validate()?;
 
         let state = State {
@@ -210,9 +232,9 @@ impl ShadyAudio {
     /// assert!(shady_audio.set_freq_range(NonZeroU32::new(5).unwrap()..NonZeroU32::new(5).unwrap()).is_err());
     /// ```
     #[inline]
-    pub fn set_freq_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
+    pub fn set_freq_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), Error> {
         if freq_range.is_empty() {
-            return Err(());
+            return Err(Error::EmptyFreqRange(freq_range));
         }
         let freq_range = u32::from(freq_range.start)..u32::from(freq_range.end);
 

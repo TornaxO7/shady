@@ -7,36 +7,13 @@ use std::{
     time::Duration,
 };
 
+use crate::Error;
+
 /// Default value for [ShadyAudioConfig.refresh_time].
 /// Set to `100` millis.
 ///
 /// [ShadyAudioConfig.refresh_time]: struct.ShadyAudioConfig.html#structfield.refresh_time
 pub const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
-
-/// Contains all invalid configurations of [`ShadyAudioConfig`].
-#[derive(thiserror::Error, Debug, Clone)]
-pub enum ConfigError {
-    /// Occurs, if you've set [`ShadyAudioConfig::freq_range`] to an empty range.
-    ///
-    /// # Example
-    /// ```rust
-    /// use shady_audio::config::{ShadyAudioConfig, ConfigError};
-    /// use std::num::NonZeroU32;
-    ///
-    /// let invalid_range = NonZeroU32::new(10).unwrap()..NonZeroU32::new(10).unwrap();
-    /// assert!(invalid_range.is_empty(), "`start` and `end` are equal");
-    ///
-    /// let config = ShadyAudioConfig {
-    ///     freq_range: invalid_range.clone(),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// // the range isn't allowed to be empty!
-    /// assert!(config.validate().is_err());
-    /// ```
-    #[error("Frequency range can't be empty but you gave: {0:?}")]
-    EmptyFreqRange(Range<NonZeroU32>),
-}
 
 /// Configure the behaviour of [ShadyAudio] by setting the appropriate values in this struct
 /// and give it to [ShadyAudio].
@@ -85,11 +62,11 @@ impl ShadyAudioConfig {
     /// Checks if the current config is valid or contains any mistakes.
     ///
     /// See [`ConfigError`] to see all possible errors.
-    pub fn validate(&self) -> Result<(), Vec<ConfigError>> {
+    pub fn validate(&self) -> Result<(), Vec<Error>> {
         let mut errors = Vec::new();
 
         if self.freq_range.is_empty() {
-            errors.push(ConfigError::EmptyFreqRange(self.freq_range.clone()))
+            errors.push(Error::EmptyFreqRange(self.freq_range.clone()))
         }
 
         if !errors.is_empty() {
