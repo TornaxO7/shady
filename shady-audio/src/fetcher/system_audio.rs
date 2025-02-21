@@ -6,6 +6,8 @@ use cpal::{
 };
 use tracing::{debug, instrument};
 
+use crate::DEFAULT_SAMPLE_RATE;
+
 use super::Fetcher;
 
 struct SampleBuffer {
@@ -90,7 +92,12 @@ impl SystemAudio {
             return Err(SystemAudioError::InvalidSampleFormat(sample_format));
         }
 
-        let stream_config = stream_config_range.with_max_sample_rate().config();
+        let stream_config = {
+            let supported_stream_config = stream_config_range
+                .try_with_sample_rate(DEFAULT_SAMPLE_RATE)
+                .unwrap_or(stream_config_range.with_max_sample_rate());
+            supported_stream_config.config()
+        };
         let sample_rate = stream_config.sample_rate;
 
         debug!("Stream config: {:?}", stream_config);

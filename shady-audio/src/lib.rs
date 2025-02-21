@@ -58,6 +58,10 @@ pub const MIN_HUMAN_FREQUENCY: Hz = 20;
 /// See: https://en.wikipedia.org/wiki/Hearing_range
 pub const MAX_HUMAN_FREQUENCY: Hz = 20_000;
 
+/// The default sample rate for a fetcher.
+/// Fetchers are allowed to use this for orientation.
+pub const DEFAULT_SAMPLE_RATE: SampleRate = SampleRate(44_100);
+
 pub use cpal;
 
 use config::{ConfigError, ShadyAudioConfig};
