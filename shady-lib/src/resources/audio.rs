@@ -40,7 +40,10 @@ impl Audio {
         self.bar_values = vec![0.; usize::from(amount_bars)].into_boxed_slice();
     }
 
-    pub fn set_frequency_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
+    pub fn set_frequency_range(
+        &mut self,
+        freq_range: Range<NonZeroU32>,
+    ) -> Result<(), shady_audio::Error> {
         self.shady_audio.set_freq_range(freq_range)
     }
 

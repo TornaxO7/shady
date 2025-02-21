@@ -261,7 +261,10 @@ impl Shady {
     /// `iAudio`
     #[inline]
     #[cfg(feature = "audio")]
-    pub fn set_audio_frequency_range(&mut self, freq_range: Range<NonZeroU32>) -> Result<(), ()> {
+    pub fn set_audio_frequency_range(
+        &mut self,
+        freq_range: Range<NonZeroU32>,
+    ) -> Result<(), shady_audio::Error> {
         self.resources.audio.set_frequency_range(freq_range)
     }
 
@@ -323,9 +326,9 @@ impl Shady {
     }
 }
 
-fn get_render_pipeline<'a>(
+fn get_render_pipeline(
     device: &Device,
-    shader_source: ShaderSource<'a>,
+    shader_source: ShaderSource<'_>,
     bind_group_layout: wgpu::BindGroupLayout,
     texture_format: &wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
@@ -345,7 +348,7 @@ fn get_render_pipeline<'a>(
         push_constant_ranges: &[],
     });
 
-    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Shady render pipeline"),
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
@@ -381,7 +384,5 @@ fn get_render_pipeline<'a>(
         }),
         multiview: None,
         cache: None,
-    });
-
-    pipeline
+    })
 }
