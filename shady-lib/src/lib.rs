@@ -7,7 +7,10 @@
 //! - `iResolution`: Contains the height and width of the surface which will be drawed on.
 //! - `iTime`: The playback time of the shader.
 //!
-//! **Note:** You should be familiar with [wgpu] code in order to be able to use this.
+//! **Note:**
+//! - You should be familiar with [wgpu] code in order to be able to use this.
+//! - `shady` is not compatible with [shadertoy]'s shaders so you can't simply copy+paste the fragment code from [shadertoy] to
+//!   application which are using `shady` (but porting them should be very easy in general).
 //!
 //! # Feature flags
 //! Each resource is behind a feature gate so if you don't want to use some of them, just disable their feature gate.
