@@ -11,7 +11,7 @@ wgpu = { version = "22.0", default-features = false, features = [
 tracing = "0.1"
 thiserror = "2"
 
-pollster = "0.4.0"
+pollster = "0.4"
 winit = "0.30"
 
 cpal = "0.15"
