@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, time::Duration};
+use std::num::NonZeroUsize;
 
 use shady_audio::{fetcher::DummyFetcher, ShadyAudio};
 
@@ -12,8 +12,7 @@ fn main() {
     )
     .unwrap();
 
-    loop {
+    for _ in 0..1000 {
         audio.get_bars();
-        std::thread::sleep(Duration::from_millis(1000 / 60));
     }
 }
