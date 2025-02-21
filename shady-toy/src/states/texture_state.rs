@@ -168,8 +168,7 @@ impl<'a> RenderState<'a> for TextureState {
     }
 
     fn update_pipeline(&mut self, shader_source: ShaderSource<'a>) {
-        self.shady
-            .update_render_pipeline(&self.device, shader_source)
+        self.shady.set_render_pipeline(&self.device, shader_source)
     }
 }
 

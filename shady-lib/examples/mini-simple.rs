@@ -124,6 +124,13 @@ impl<'a> State<'a> {
         self.surface.configure(&self.device, &self.config);
     }
 
+    pub fn _change_fragment_code(&mut self, source: ShaderSource<'a>) {
+        // SHADY
+        //
+        // Tell shady to use a new/other fragment code to render it.
+        self.shady.set_render_pipeline(&self.device, source);
+    }
+
     pub fn render(&mut self) {
         let output = self.surface.get_current_texture().unwrap();
         let view = output

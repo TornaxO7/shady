@@ -16,10 +16,14 @@ struct Coord {
     pub y: f32,
 }
 
+/// Represents the state of the mouse.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseState {
+    /// Means the mouse was released.
     Released,
+
+    /// Means the mouse was pressed.
     Pressed,
 }
 

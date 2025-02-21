@@ -1,3 +1,75 @@
+//! A [shadertoy] *like* library to be able to easily integrate [shadertoy]-*like* stuff in your applications.
+//! It provides functions to setup the following uniform buffers (which will be also called `Resources` within this doc):
+//!
+//! - `iAudio`: Contains frequency bars of an audio source.
+//! - `iFrame`: Contains the current frame count.
+//! - `iMouse`: Contains the coordinate points of the user's mouse.
+//! - `iResolution`: Contains the height and width of the surface which will be drawed on.
+//! - `iTime`: The playback time of the shader.
+//!
+//! **Note:** You should be familiar with [wgpu] code in order to be able to use this.
+//!
+//! # Feature flags
+//! Each resource is behind a feature gate so if you don't want to use some of them, just disable their feature gate.
+//!
+//! # Example
+//! An (mini) example can be seen here: <https://github.com/TornaxO7/shady/blob/main/shady-lib/examples/mini-simple.rs>
+//!
+//! But here's a rough structure how it's meant to be used:
+//!
+//! ```ignore
+//! use shady::{Shady, ShadyDescriptor};
+//!
+//! struct State {
+//!     shady: Shady,
+//!
+//!     // ... and your other wgpu stuff, like `wgpu::Device`, etc.
+//!     queue: wgpu::Queue,
+//!     device: wgpu::Device,
+//! }
+//!
+//! impl State {
+//!     pub fn new() -> Self {
+//!         // .. your stuff
+//!
+//!         let shady = Shady::new(ShadyDescriptor {
+//!             // ... set the attributes
+//!         });
+//!
+//!         // ...
+//!     }
+//!
+//!     pub fn prepare_next_frame(&mut self) {
+//!         // here you can change some properties of shady or change
+//!         // the values of the uniform buffers of the fragment shader
+//!         self.shady.inc_frame();
+//!
+//!         // ... afterwards tell shady to move the values into the uniform buffer
+//!         self.shady.update_frame_buffer(&mut self.queue);
+//!         // ... and other buffers you'd like to update
+//!     }
+//!
+//!     pub fn render(&mut self) {
+//!         // ...
+//!
+//!         let view = ...;
+//!         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+//!            label: Some("Some random encoder"),
+//!         });
+//!
+//!         // shady will add a render pass and you are good to go!
+//!         self.shady.add_render_pass(&mut encoder, &view);
+//!     }
+//!
+//!     pub fn load_fragment_code<'a>(&mut self, shader_source: wgpu::ShaderSource<'a>) {
+//!         // set the render pipeline which should execute the given fragment code
+//!         self.shady.set_render_pipeline(&self.device, shader_source);
+//!     }
+//! }
+//! ```
+//!
+//! [shadertoy]: https://www.shadertoy.com/
+//! [wgpu]: https://crates.io/crates/wgpu
 mod descriptor;
 mod resources;
 mod template;
@@ -18,8 +90,10 @@ pub use resources::MouseState;
 pub use template::TemplateLang;
 pub use vertices::{index_buffer, index_buffer_range, vertex_buffer, BUFFER_LAYOUT};
 
+/// The name of the entrypoint function of the fragment shader for `shady`.
 pub const FRAGMENT_ENTRYPOINT: &str = "main";
 
+/// The main struct of this crate.
 pub struct Shady {
     resources: Resources,
     bind_group: wgpu::BindGroup,
@@ -36,6 +110,7 @@ pub struct Shady {
 
 // General functions
 impl Shady {
+    /// Create a new instance of `Shady`.
     #[instrument(level = "trace")]
     pub fn new<'a>(desc: ShadyDescriptor) -> Self {
         let ShadyDescriptor {
@@ -96,7 +171,7 @@ impl Shady {
     }
 
     #[instrument(skip(self, device), level = "trace")]
-    pub fn update_render_pipeline<'a>(&mut self, device: &Device, shader_source: ShaderSource<'a>) {
+    pub fn set_render_pipeline<'a>(&mut self, device: &Device, shader_source: ShaderSource<'a>) {
         #[cfg(feature = "frame")]
         self.resources.frame.reset_counter();
         let bind_group_layout = Resources::bind_group_layout(device);

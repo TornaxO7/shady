@@ -140,7 +140,6 @@ impl<'a> RenderState<'a> for WindowState<'a> {
 
     #[instrument(skip_all)]
     fn update_pipeline(&mut self, shader_source: ShaderSource<'a>) {
-        self.shady
-            .update_render_pipeline(&self.device, shader_source);
+        self.shady.set_render_pipeline(&self.device, shader_source);
     }
 }
