@@ -12,7 +12,7 @@ pub struct Frame {
 
 impl Frame {
     pub fn inc(&mut self) {
-        self.value += 1;
+        (self.value, _) = self.value.overflowing_add(1)
     }
 }
 
