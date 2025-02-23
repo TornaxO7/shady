@@ -193,8 +193,8 @@ impl Shady {
     /// `iAudio`
     #[inline]
     #[cfg(feature = "audio")]
-    pub fn set_audio_bars(&mut self, amount_bars: NonZeroUsize) {
-        self.resources.audio.set_bars(amount_bars);
+    pub fn set_audio_bars(&mut self, device: &Device, amount_bars: NonZeroUsize) {
+        self.resources.audio.set_bars(device, amount_bars);
     }
 
     /// Set the audio fetcher which [Shady] should use.

@@ -24,10 +24,8 @@ impl Resolution {
 }
 
 impl Resource for Resolution {
-    type BufferDataType = [f32; 2];
-
     fn new(device: &Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device);
+        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<[f32; 2]>() as u64);
 
         Self {
             width: 0,

@@ -14,10 +14,8 @@ pub struct Time {
 }
 
 impl Resource for Time {
-    type BufferDataType = f32;
-
     fn new(device: &Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device);
+        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<f32>() as u64);
 
         Self {
             time: Instant::now(),

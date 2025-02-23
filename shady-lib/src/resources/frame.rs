@@ -17,10 +17,8 @@ impl Frame {
 }
 
 impl Resource for Frame {
-    type BufferDataType = u32;
-
     fn new(device: &wgpu::Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device);
+        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<u32>() as u64);
 
         Self { value: 0, buffer }
     }

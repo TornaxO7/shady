@@ -35,9 +35,12 @@ impl Audio {
         self.bar_values.copy_from_slice(bars);
     }
 
-    pub fn set_bars(&mut self, amount_bars: NonZeroUsize) {
+    pub fn set_bars(&mut self, device: &Device, amount_bars: NonZeroUsize) {
         self.shady_audio.set_bars(amount_bars);
         self.bar_values = vec![0.; usize::from(amount_bars)].into_boxed_slice();
+
+        self.buffer =
+            Self::create_storage_buffer(device, std::mem::size_of_val(&self.bar_values) as u64);
     }
 
     pub fn set_frequency_range(
@@ -53,10 +56,11 @@ impl Audio {
 }
 
 impl Resource for Audio {
-    type BufferDataType = [f32; DEFAULT_AMOUNT_BARS];
-
     fn new(device: &Device) -> Self {
-        let buffer = Self::create_storage_buffer(device);
+        let buffer = Self::create_storage_buffer(
+            device,
+            std::mem::size_of::<[f32; DEFAULT_AMOUNT_BARS]>() as u64,
+        );
 
         let shady_audio = ShadyAudio::new(
             SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),

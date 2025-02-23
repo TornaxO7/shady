@@ -45,8 +45,6 @@ enum BindingValue {
 }
 
 pub trait Resource: TemplateGenerator {
-    type BufferDataType;
-
     fn new(device: &Device) -> Self;
 
     fn binding() -> u32;
@@ -59,19 +57,19 @@ pub trait Resource: TemplateGenerator {
 
     fn buffer_type() -> wgpu::BufferBindingType;
 
-    fn create_uniform_buffer(device: &Device) -> wgpu::Buffer {
+    fn create_uniform_buffer(device: &Device, size: u64) -> wgpu::Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(Self::buffer_label()),
-            size: std::mem::size_of::<Self::BufferDataType>() as u64,
+            size,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         })
     }
 
-    fn create_storage_buffer(device: &Device) -> wgpu::Buffer {
+    fn create_storage_buffer(device: &Device, size: u64) -> wgpu::Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(Self::buffer_label()),
-            size: std::mem::size_of::<Self::BufferDataType>() as u64,
+            size,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         })

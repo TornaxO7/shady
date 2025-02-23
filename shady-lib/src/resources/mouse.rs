@@ -60,10 +60,8 @@ impl Mouse {
 }
 
 impl Resource for Mouse {
-    type BufferDataType = [f32; 4];
-
     fn new(device: &wgpu::Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device);
+        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<[f32; 4]>() as u64);
 
         Self {
             pos: Coord::default(),
