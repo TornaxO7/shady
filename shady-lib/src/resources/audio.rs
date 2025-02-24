@@ -96,7 +96,7 @@ impl Resource for Audio {
         super::BindingValue::Audio as u32
     }
 
-    fn update_buffer(&self, queue: &mut wgpu::Queue) {
+    fn update_buffer(&self, queue: &wgpu::Queue) {
         let bars = &self.bar_values;
         queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(bars));
     }

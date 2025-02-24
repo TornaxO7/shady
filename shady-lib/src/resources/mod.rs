@@ -51,7 +51,7 @@ pub trait Resource: TemplateGenerator {
 
     fn buffer_label() -> &'static str;
 
-    fn update_buffer(&self, queue: &mut wgpu::Queue);
+    fn update_buffer(&self, queue: &wgpu::Queue);
 
     fn buffer(&self) -> &wgpu::Buffer;
 

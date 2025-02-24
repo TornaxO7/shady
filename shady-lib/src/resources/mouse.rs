@@ -87,7 +87,7 @@ impl Resource for Mouse {
         wgpu::BufferBindingType::Uniform
     }
 
-    fn update_buffer(&self, queue: &mut wgpu::Queue) {
+    fn update_buffer(&self, queue: &wgpu::Queue) {
         let data = [
             self.pressed_pos.x,
             self.pressed_pos.y,

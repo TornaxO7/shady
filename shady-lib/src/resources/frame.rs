@@ -35,7 +35,7 @@ impl Resource for Frame {
         wgpu::BufferBindingType::Uniform
     }
 
-    fn update_buffer(&self, queue: &mut wgpu::Queue) {
+    fn update_buffer(&self, queue: &wgpu::Queue) {
         queue.write_buffer(self.buffer(), 0, &self.value.to_ne_bytes());
     }
 

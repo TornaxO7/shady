@@ -46,7 +46,7 @@ impl Resource for Resolution {
         super::BindingValue::Resolution as u32
     }
 
-    fn update_buffer(&self, queue: &mut wgpu::Queue) {
+    fn update_buffer(&self, queue: &wgpu::Queue) {
         let data = {
             let width = self.width as f32;
             let height = self.height as f32;
