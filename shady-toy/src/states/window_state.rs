@@ -111,15 +111,15 @@ impl<'a> RenderState<'a> for WindowState<'a> {
         self.shady.inc_frame();
 
         #[cfg(feature = "audio")]
-        self.shady.update_audio_buffer(&mut self.queue);
+        self.shady.update_audio_buffer(&self.queue);
         #[cfg(feature = "frame")]
-        self.shady.update_frame_buffer(&mut self.queue);
+        self.shady.update_frame_buffer(&self.queue);
         #[cfg(feature = "mouse")]
-        self.shady.update_mouse_buffer(&mut self.queue);
+        self.shady.update_mouse_buffer(&self.queue);
         #[cfg(feature = "resolution")]
-        self.shady.update_resolution_buffer(&mut self.queue);
+        self.shady.update_resolution_buffer(&self.queue);
         #[cfg(feature = "time")]
-        self.shady.update_time_buffer(&mut self.queue);
+        self.shady.update_time_buffer(&self.queue);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -135,7 +135,7 @@ impl<'a> RenderState<'a> for WindowState<'a> {
                     label: Some("WindowState render encoder"),
                 });
 
-            self.shady.add_render_pass(&mut encoder, &view, &pipeline);
+            self.shady.add_render_pass(&mut encoder, &view, pipeline);
 
             self.queue.submit(std::iter::once(encoder.finish()));
             output.present();
