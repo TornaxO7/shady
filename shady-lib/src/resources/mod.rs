@@ -57,6 +57,8 @@ pub trait Resource: TemplateGenerator {
 
     fn buffer_type() -> wgpu::BufferBindingType;
 
+    // `unused`: For example if the dev enables just the `audio` feature, this function wouldn't be used.
+    #[allow(unused)]
     fn create_uniform_buffer(device: &Device, size: u64) -> wgpu::Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(Self::buffer_label()),
@@ -66,6 +68,8 @@ pub trait Resource: TemplateGenerator {
         })
     }
 
+    // `unused`: For example if the dev enables just the `time` feature, this function wouldn't be used.
+    #[allow(unused)]
     fn create_storage_buffer(device: &Device, size: u64) -> wgpu::Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(Self::buffer_label()),

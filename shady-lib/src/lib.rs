@@ -29,10 +29,6 @@ mod template;
 mod vertices;
 
 use resources::{Resource, Resources};
-use std::{
-    num::{NonZeroU32, NonZeroUsize},
-    ops::Range,
-};
 use tracing::instrument;
 use wgpu::{CommandEncoder, Device, ShaderSource, TextureView};
 
@@ -182,7 +178,7 @@ impl Shady {
     #[cfg(feature = "audio")]
     pub fn set_audio_frequency_range(
         &mut self,
-        freq_range: Range<NonZeroU32>,
+        freq_range: std::ops::Range<std::num::NonZeroU32>,
     ) -> Result<(), shady_audio::Error> {
         self.resources.audio.set_frequency_range(freq_range)
     }
@@ -193,7 +189,7 @@ impl Shady {
     /// `iAudio`
     #[inline]
     #[cfg(feature = "audio")]
-    pub fn set_audio_bars(&mut self, device: &Device, amount_bars: NonZeroUsize) {
+    pub fn set_audio_bars(&mut self, device: &Device, amount_bars: std::num::NonZeroUsize) {
         self.resources.audio.set_bars(device, amount_bars);
     }
 

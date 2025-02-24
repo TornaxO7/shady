@@ -96,6 +96,7 @@ impl<'a> WindowState<'a> {
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
+            #[cfg(feature = "resolution")]
             self.shady.set_resolution(new_size.width, new_size.height);
             self.config.width = new_size.width;
             self.config.height = new_size.height;
@@ -106,12 +107,18 @@ impl<'a> WindowState<'a> {
 
 impl<'a> RenderState<'a> for WindowState<'a> {
     fn prepare_next_frame(&mut self) {
+        #[cfg(feature = "frame")]
         self.shady.inc_frame();
 
+        #[cfg(feature = "audio")]
         self.shady.update_audio_buffer(&mut self.queue);
+        #[cfg(feature = "frame")]
         self.shady.update_frame_buffer(&mut self.queue);
+        #[cfg(feature = "mouse")]
         self.shady.update_mouse_buffer(&mut self.queue);
+        #[cfg(feature = "resolution")]
         self.shady.update_resolution_buffer(&mut self.queue);
+        #[cfg(feature = "time")]
         self.shady.update_time_buffer(&mut self.queue);
     }
 

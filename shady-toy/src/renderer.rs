@@ -1,7 +1,6 @@
 use std::{borrow::Cow, fs::File, io::Read, path::PathBuf};
 
 use ariadne::{Color, Fmt};
-use shady::MouseState;
 use tracing::{debug, warn};
 use wgpu::{
     naga::{
@@ -11,9 +10,7 @@ use wgpu::{
     ShaderSource, SurfaceError,
 };
 use winit::{
-    application::ApplicationHandler,
-    event::{ElementState, WindowEvent},
-    event_loop::ActiveEventLoop,
+    application::ApplicationHandler, event::WindowEvent, event_loop::ActiveEventLoop,
     window::WindowAttributes,
 };
 
@@ -145,15 +142,21 @@ impl<'a> ApplicationHandler<UserEvent> for Renderer<'a> {
                 }
             }
             WindowEvent::Resized(new_size) => state.resize(new_size),
+            #[cfg(feature = "mouse")]
             WindowEvent::MouseInput {
                 state: mouse_state, ..
             } => {
                 let shady = &mut state.shady;
                 match mouse_state {
-                    ElementState::Pressed => shady.set_mouse_state(MouseState::Pressed),
-                    ElementState::Released => shady.set_mouse_state(MouseState::Released),
+                    winit::event::ElementState::Pressed => {
+                        shady.set_mouse_state(shady::MouseState::Pressed)
+                    }
+                    winit::event::ElementState::Released => {
+                        shady.set_mouse_state(shady::MouseState::Released)
+                    }
                 }
             }
+            #[cfg(feature = "mouse")]
             WindowEvent::CursorMoved { position: pos, .. } => {
                 state.shady.set_mouse_pos(pos.x as f32, pos.y as f32)
             }
