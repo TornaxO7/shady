@@ -209,7 +209,7 @@ impl Shady {
     /// Updates the `iAudio` uniform buffer with new values.
     #[inline]
     #[cfg(feature = "audio")]
-    pub fn update_audio_buffer(&mut self, queue: &mut wgpu::Queue) {
+    pub fn update_audio_buffer(&mut self, queue: &wgpu::Queue) {
         self.resources.audio.fetch_audio();
         self.resources.audio.update_buffer(queue);
     }
@@ -217,28 +217,28 @@ impl Shady {
     /// Updates the `iFrame` uniform buffer with new values.
     #[inline]
     #[cfg(feature = "frame")]
-    pub fn update_frame_buffer(&mut self, queue: &mut wgpu::Queue) {
+    pub fn update_frame_buffer(&mut self, queue: &wgpu::Queue) {
         self.resources.frame.update_buffer(queue);
     }
 
     /// Updates the `iMouse` uniform buffer with new values.
     #[inline]
     #[cfg(feature = "mouse")]
-    pub fn update_mouse_buffer(&mut self, queue: &mut wgpu::Queue) {
+    pub fn update_mouse_buffer(&mut self, queue: &wgpu::Queue) {
         self.resources.mouse.update_buffer(queue);
     }
 
     /// Updates the `iResolution` uniform buffer with new values.
     #[inline]
     #[cfg(feature = "resolution")]
-    pub fn update_resolution_buffer(&mut self, queue: &mut wgpu::Queue) {
+    pub fn update_resolution_buffer(&mut self, queue: &wgpu::Queue) {
         self.resources.resolution.update_buffer(queue);
     }
 
     /// Updates the `iTime` uniform buffer with new values.
     #[inline]
     #[cfg(feature = "time")]
-    pub fn update_time_buffer(&mut self, queue: &mut wgpu::Queue) {
+    pub fn update_time_buffer(&mut self, queue: &wgpu::Queue) {
         self.resources.time.update_buffer(queue);
     }
 }
