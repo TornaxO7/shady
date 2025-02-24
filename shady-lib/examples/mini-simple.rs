@@ -81,7 +81,7 @@ impl<'a> State<'a> {
         // Create the render pipeline which shady will use.
         let pipeline = {
             let fragment_shader = {
-                let template = shady::TemplateLang::Wgsl.generate_to_string().unwrap();
+                let template = shady::TemplateLang::Wgsl.generate_to_string(None).unwrap();
 
                 ShaderSource::Wgsl(Cow::Owned(template))
             };

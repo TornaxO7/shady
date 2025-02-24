@@ -124,8 +124,8 @@ fn add_template_to_file(path: &Path) -> Result<(), Error> {
     let frontend = ShaderLanguage::try_from(path).map_err(Error::UnknownShaderFileExtension)?;
 
     let template = match frontend {
-        ShaderLanguage::Wgsl => TemplateLang::Wgsl.generate_to_string(),
-        ShaderLanguage::Glsl => TemplateLang::Glsl.generate_to_string(),
+        ShaderLanguage::Wgsl => TemplateLang::Wgsl.generate_to_string(None),
+        ShaderLanguage::Glsl => TemplateLang::Glsl.generate_to_string(None),
     }
     .expect("Write template to given path");
 
