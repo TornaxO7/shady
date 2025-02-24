@@ -191,6 +191,8 @@ impl Shady {
     #[cfg(feature = "audio")]
     pub fn set_audio_bars(&mut self, device: &Device, amount_bars: std::num::NonZeroUsize) {
         self.resources.audio.set_bars(device, amount_bars);
+        // audio buffer will change => needs to be rebinded
+        self.bind_group = self.resources.bind_group(device);
     }
 
     /// Set the audio fetcher which [Shady] should use.

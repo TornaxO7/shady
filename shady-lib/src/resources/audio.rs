@@ -99,8 +99,7 @@ impl Resource for Audio {
     }
 
     fn update_buffer(&self, queue: &wgpu::Queue) {
-        let bars = &self.bar_values;
-        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(bars));
+        queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&self.bar_values));
     }
 }
 

@@ -37,7 +37,6 @@ impl Resource for Time {
 
     fn update_buffer(&self, queue: &wgpu::Queue) {
         let elapsed_time = self.time.elapsed().as_secs_f32();
-
         queue.write_buffer(self.buffer(), 0, bytemuck::cast_slice(&[elapsed_time]));
     }
 
