@@ -39,8 +39,10 @@ impl Audio {
         self.shady_audio.set_bars(amount_bars);
         self.bar_values = vec![0.; usize::from(amount_bars)].into_boxed_slice();
 
-        self.buffer =
-            Self::create_storage_buffer(device, std::mem::size_of_val(&self.bar_values) as u64);
+        self.buffer = Self::create_storage_buffer(
+            device,
+            (std::mem::size_of::<f32>() * usize::from(amount_bars)) as u64,
+        );
     }
 
     pub fn set_frequency_range(
