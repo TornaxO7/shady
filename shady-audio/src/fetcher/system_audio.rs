@@ -193,7 +193,11 @@ impl Fetcher for SystemAudio {
 fn default_output_config(device: &cpal::Device) -> Option<SupportedStreamConfigRange> {
     let mut matching_configs: Vec<_> = device
         .supported_output_configs()
-        .expect("Get supported output configs of device")
+        .expect(concat![
+            "Eh... somehow `shady-audio` couldn't get any supported output configs of your audio device.\n",
+            "Could it be that you are running \"pure\" pulseaudio?\n",
+            "Only ALSA and JACK are supported for audio processing :("
+        ])
         .filter(|entry| entry.channels() == 1 && entry.sample_format() == SampleFormat::F32)
         .collect();
 
