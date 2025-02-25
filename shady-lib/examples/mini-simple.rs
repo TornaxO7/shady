@@ -136,7 +136,7 @@ impl<'a> State<'a> {
         //
         // Add the render pass to the encoder to draw the next frame.
         self.shady
-            .add_render_pass(&mut encoder, &view, &self.pipeline);
+            .add_render_pass(&mut encoder, &view, std::iter::once(&self.pipeline));
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();

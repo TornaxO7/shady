@@ -143,7 +143,7 @@ impl<'a> RenderState<'a> for TextureState {
                 });
 
             self.shady
-                .add_render_pass(&mut encoder, &texture_view, pipeline);
+                .add_render_pass(&mut encoder, &texture_view, std::iter::once(pipeline));
 
             encoder.copy_texture_to_buffer(
                 wgpu::TexelCopyTextureInfo {

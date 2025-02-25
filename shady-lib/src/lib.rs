@@ -51,6 +51,12 @@ const VBUFFER_INDEX: u32 = 0;
 #[derive(Debug, Clone)]
 pub struct ShadyRenderPipeline(wgpu::RenderPipeline);
 
+impl AsRef<ShadyRenderPipeline> for ShadyRenderPipeline {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 /// The main struct of this crate.
 ///
 /// # Example
@@ -86,11 +92,11 @@ impl Shady {
     }
 
     /// Add a render pass to the given `encoder` and `texture_view`.
-    pub fn add_render_pass(
+    pub fn add_render_pass<'a>(
         &self,
         encoder: &mut CommandEncoder,
         texture_view: &TextureView,
-        shady_pipeline: &ShadyRenderPipeline,
+        pipelines: impl IntoIterator<Item = impl AsRef<ShadyRenderPipeline>>,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render pass"),
@@ -105,11 +111,14 @@ impl Shady {
             ..Default::default()
         });
 
-        render_pass.set_pipeline(&shady_pipeline.0);
         render_pass.set_bind_group(BIND_GROUP_INDEX, &self.bind_group, &[]);
         render_pass.set_vertex_buffer(VBUFFER_INDEX, self.vbuffer.slice(..));
         render_pass.set_index_buffer(self.ibuffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(vertices::index_buffer_range(), 0, 0..1);
+
+        for pipeline in pipelines.into_iter() {
+            render_pass.set_pipeline(&pipeline.as_ref().0);
+            render_pass.draw_indexed(vertices::index_buffer_range(), 0, 0..1);
+        }
     }
 }
 

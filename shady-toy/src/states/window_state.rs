@@ -135,7 +135,7 @@ impl<'a> RenderState<'a> for WindowState<'a> {
                     label: Some("WindowState render encoder"),
                 });
 
-            self.shady.add_render_pass(&mut encoder, &view, pipeline);
+            self.shady.add_render_pass(&mut encoder, &view, &[pipeline]);
 
             self.queue.submit(std::iter::once(encoder.finish()));
             output.present();
