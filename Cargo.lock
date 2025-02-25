@@ -2512,7 +2512,7 @@ dependencies = [
 
 [[package]]
 name = "shady"
-version = "5.0.5"
+version = "6.0.0"
 dependencies = [
  "bytemuck",
  "pollster",
