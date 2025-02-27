@@ -5,6 +5,9 @@ use realfft::{num_complex::Complex32, RealFftPlanner};
 
 use crate::fetcher::Fetcher;
 
+/// Processes the samples of the given fetcher.
+///
+/// This struct manages the frequency values
 pub struct AudioProcessor<Tag> {
     planner: RealFftPlanner<f32>,
     hann_window: Box<[f32]>,

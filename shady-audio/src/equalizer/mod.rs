@@ -119,7 +119,6 @@ impl<Tag> Equalizer<Tag> {
     /// };
     /// use std::num::NonZeroUsize;
     ///
-    ///
     /// struct Tag;
     ///
     /// let amount_bars = 5;
