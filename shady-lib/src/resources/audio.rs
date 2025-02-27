@@ -5,7 +5,7 @@ use std::{
 };
 
 use shady_audio::{
-    config::ShadyAudioConfig,
+    config::EqualizerConfig,
     fetcher::{Fetcher, SystemAudioFetcher},
     ShadyAudio,
 };
@@ -66,7 +66,7 @@ impl Resource for Audio {
 
         let shady_audio = ShadyAudio::new(
             SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
-            ShadyAudioConfig {
+            EqualizerConfig {
                 amount_bars: NonZeroUsize::new(DEFAULT_AMOUNT_BARS).unwrap(),
                 ..Default::default()
             },

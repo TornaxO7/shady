@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Bar, BarChart, BarGroup},
     Frame,
 };
-use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
+use shady_audio::{config::EqualizerConfig, fetcher::SystemAudioFetcher, ShadyAudio};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 const HEIGHT: u64 = 1000;
@@ -65,7 +65,7 @@ fn main() -> std::io::Result<()> {
         color: cli.color,
         audio: ShadyAudio::new(
             SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
-            ShadyAudioConfig::default(),
+            EqualizerConfig::default(),
         )
         .unwrap(),
     };
