@@ -11,7 +11,7 @@ use crate::{processor::AudioProcessor, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY}
 
 /// The errors which can occur while configuring the [Equalizer].
 #[derive(thiserror::Error, Debug, Clone)]
-pub enum Error {
+pub enum EqualizerError {
     /// The sample rate of the fetcher of the audio processor is too low.
     ///
     /// # The bigger context
@@ -24,7 +24,7 @@ pub enum Error {
 
     /// The given config is invalid.
     #[error(transparent)]
-    InvalidConfig(#[from] config::Error),
+    InvalidConfig(#[from] config::ConfigError),
 }
 
 #[derive(Debug, Clone)]
@@ -54,9 +54,9 @@ pub struct Equalizer<Tag> {
 impl<Tag> Equalizer<Tag> {
     /// Create a new equalizer for the given audio processor.
     pub fn new(
-        config: impl AsRef<config::Config>,
+        config: impl AsRef<config::EqualizerConfig>,
         processor: &AudioProcessor<Tag>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, EqualizerError> {
         let config = config.as_ref();
         assert!(
             processor.sample_rate().0 > 0,
@@ -81,7 +81,7 @@ impl<Tag> Equalizer<Tag> {
     /// # Example
     /// ```rust
     /// use shady_audio::{
-    ///     equalizer::{Equalizer, config::Config},
+    ///     equalizer::{Equalizer, config::EqualizerConfig},
     ///     fetcher::DummyFetcher,
     ///     processor::AudioProcessor,
     /// };
@@ -92,7 +92,7 @@ impl<Tag> Equalizer<Tag> {
     /// let amount_bars = 5;
     ///
     /// let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
-    /// let mut equalizer = Equalizer::new(Config {
+    /// let mut equalizer = Equalizer::new(EqualizerConfig {
     ///         amount_bars: NonZeroUsize::new(amount_bars).unwrap(),
     ///         ..Default::default()
     ///     }, &audio
@@ -167,7 +167,7 @@ impl<Tag> Equalizer<Tag> {
         &self.bar_values
     }
 
-    fn inner_new(state: State) -> Result<Self, Error> {
+    fn inner_new(state: State) -> Result<Self, EqualizerError> {
         let bar_values = vec![0.; state.amount_bars].into_boxed_slice();
         let started_falling = vec![false; state.amount_bars].into_boxed_slice();
 
@@ -190,7 +190,7 @@ impl<Tag> Equalizer<Tag> {
             debug!("Available bins: {}", amount_bins);
 
             if amount_bins < state.amount_bars {
-                return Err(Error::TooLowSampleRate {
+                return Err(EqualizerError::TooLowSampleRate {
                     min_sample_rate: state.fft_size,
                 });
             }

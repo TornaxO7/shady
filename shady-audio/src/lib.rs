@@ -10,7 +10,7 @@
 //! # Example
 //! ```rust
 //! use shady_audio::{
-//!     equalizer::{Equalizer, config::Config},
+//!     equalizer::{Equalizer, config::EqualizerConfig},
 //!     fetcher::DummyFetcher,
 //!     processor::AudioProcessor,
 //! };
@@ -21,7 +21,7 @@
 //! let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
 //!
 //! // now create for each processor an equalizer
-//! let mut equalizer = Equalizer::new(Config::default(), &audio).unwrap();
+//! let mut equalizer = Equalizer::new(EqualizerConfig::default(), &audio).unwrap();
 //!
 //! // let the processor process the next batch
 //! audio.process();

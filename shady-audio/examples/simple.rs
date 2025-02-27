@@ -1,5 +1,5 @@
 use shady_audio::{
-    equalizer::{config::Config, Equalizer},
+    equalizer::{config::EqualizerConfig, Equalizer},
     fetcher::DummyFetcher,
     processor::AudioProcessor,
 };
@@ -11,7 +11,7 @@ fn main() {
     let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
 
     // now create for each processor an equalizer
-    let mut equalizer = Equalizer::new(Config::default(), &audio).unwrap();
+    let mut equalizer = Equalizer::new(EqualizerConfig::default(), &audio).unwrap();
 
     // let the processor process the next batch
     audio.process();

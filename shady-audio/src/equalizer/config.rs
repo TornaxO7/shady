@@ -8,18 +8,18 @@ use std::{
 
 /// All validation errors of the [Config].
 #[derive(thiserror::Error, Debug, Clone)]
-pub enum Error {
+pub enum ConfigError {
     /// Occurs, if you've set [`Config::freq_range`] to an empty range.
     ///
     /// # Example
     /// ```rust
-    /// use shady_audio::equalizer::config::Config;
+    /// use shady_audio::equalizer::config::EqualizerConfig;
     /// use std::num::NonZeroU32;
     ///
     /// let invalid_range = NonZeroU32::new(10).unwrap()..NonZeroU32::new(10).unwrap();
     /// assert!(invalid_range.is_empty(), "`start` and `end` are equal");
     ///
-    /// let config = Config {
+    /// let config = EqualizerConfig {
     ///     freq_range: invalid_range.clone(),
     ///     ..Default::default()
     /// };
@@ -35,7 +35,7 @@ pub enum Error {
 ///
 /// [Equalizer]: crate::equalizer::Equalizer
 #[derive(Debug, Clone)]
-pub struct Config {
+pub struct EqualizerConfig {
     /// Set the amount bars which should be used.
     pub amount_bars: NonZeroUsize,
 
@@ -43,10 +43,10 @@ pub struct Config {
     ///
     /// # Example
     /// ```rust
-    /// use shady_audio::equalizer::config::Config;
+    /// use shady_audio::equalizer::config::EqualizerConfig;
     /// use std::num::NonZeroU32;
     ///
-    /// let config = Config {
+    /// let config = EqualizerConfig {
     ///     // `shady_audio` should only listen to the frequencies starting from 10Hz up to 15_000Hz.
     ///     freq_range: NonZeroU32::new(100).unwrap()..NonZeroU32::new(15_000).unwrap(),
     ///     ..Default::default()
@@ -63,20 +63,20 @@ pub struct Config {
     pub init_sensitivity: f32,
 }
 
-impl Config {
+impl EqualizerConfig {
     /// Checks if the current config is valid or contains any mistakes.
     ///
     /// See [`Error`] to see all possible errors.
-    pub fn validate(&self) -> Result<(), Error> {
+    pub fn validate(&self) -> Result<(), ConfigError> {
         if self.freq_range.is_empty() {
-            return Err(Error::EmptyFreqRange(self.freq_range.clone()));
+            return Err(ConfigError::EmptyFreqRange(self.freq_range.clone()));
         }
 
         Ok(())
     }
 }
 
-impl Default for Config {
+impl Default for EqualizerConfig {
     fn default() -> Self {
         Self {
             amount_bars: NonZeroUsize::new(32).unwrap(),
@@ -86,8 +86,8 @@ impl Default for Config {
     }
 }
 
-impl AsRef<Config> for Config {
-    fn as_ref(&self) -> &Config {
+impl AsRef<EqualizerConfig> for EqualizerConfig {
+    fn as_ref(&self) -> &EqualizerConfig {
         self
     }
 }

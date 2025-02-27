@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use shady_audio::{
-    equalizer::{config::Config, Equalizer},
+    equalizer::{config::EqualizerConfig, Equalizer},
     fetcher::DummyFetcher,
     processor::AudioProcessor,
 };
@@ -14,7 +14,7 @@ fn correct_amount_bars() {
 
     let audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
     let mut equalizer = Equalizer::new(
-        Config {
+        EqualizerConfig {
             amount_bars: NonZeroUsize::new(amount_bars).unwrap(),
             ..Default::default()
         },
