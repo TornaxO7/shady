@@ -6,7 +6,7 @@ use std::{
     ops::Range,
 };
 
-/// All validation errors of the [Config].
+/// All validation errors of the [EqualizerConfig].
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum ConfigError {
     /// Occurs, if you've set [`Config::freq_range`] to an empty range.
@@ -36,7 +36,9 @@ pub enum ConfigError {
 /// [Equalizer]: crate::equalizer::Equalizer
 #[derive(Debug, Clone)]
 pub struct EqualizerConfig {
-    /// Set the amount bars which should be used.
+    /// Set the amount of bars which should be returned from [Equalizer::get_bars].
+    ///
+    /// [Equalizer::get_bars]: crate::equalizer::Equalizer::get_bars
     pub amount_bars: NonZeroUsize,
 
     /// Set the frequency range of which the equalizer should listen to for the bars.

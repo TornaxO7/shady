@@ -2,7 +2,7 @@
 pub mod config;
 
 use core::f32;
-use std::{marker::PhantomData, num::NonZeroUsize, ops::Range};
+use std::{marker::PhantomData, num::{NonZeroU32, NonZeroUsize}, ops::Range};
 
 use cpal::SampleRate;
 use tracing::debug;

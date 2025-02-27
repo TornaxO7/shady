@@ -22,7 +22,7 @@
 //! let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
 //!
 //! // now create an equalizer for the given processor.
-//! let mut equalizer = Equalizer::new(EqualizerConfig::default(), &audio).unwrap();
+//! let mut equalizer: Equalizer<Tag> = Equalizer::new(EqualizerConfig::default(), &audio).unwrap();
 //!
 //! // let the processor process the next batch
 //! audio.process();
@@ -31,7 +31,7 @@
 //! equalizer.get_bars(&audio);
 //!
 //! // NOTE: If you uncomment the lines after `==` it won't compile.
-//! // `equalizer` is only allowed to process the data from the processor with the tag `Tag`.
+//! // `equalizer` is only allowed to process the data from the processor which has the same `Tag`.
 //! // However, you can create any amounut of equalizer with different settings (for example different amount of bars) which are reading from the
 //! // same audio processor with the same tag.
 //! // ===
