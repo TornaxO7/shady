@@ -7,7 +7,35 @@ use crate::fetcher::Fetcher;
 
 /// Processes the samples of the given fetcher.
 ///
-/// This struct manages the frequency values
+/// The structs fetches the samples of the fetcher and creates the frequency bins which should then be further
+/// processed by the equalizers.
+///
+/// # `Tag`
+/// The `Tag` generic is there to avoid mixing up multiple equalizers with multiple `AudioProcessor`s.
+/// In code, it avoids the following case:
+///
+/// ```rust
+/// use shady_audio::{
+///     equalizer::{config::EqualizerConfig, Equalizer},
+///     fetcher::DummyFetcher,
+///     AudioProcessor,
+/// };
+///
+/// struct Tag1;
+/// struct Tag2;
+///
+/// let audio1: AudioProcessor<Tag1> = AudioProcessor::new(DummyFetcher::new());
+/// let audio2: AudioProcessor<Tag2> = AudioProcessor::new(DummyFetcher::new());
+///
+/// let mut equalizer = Equalizer::new(EqualizerConfig::default(), &audio1).unwrap();
+///
+/// // the equalizer is only allowed to create the bars of `audio1` or in other words: Only the `AudioProcessor`
+/// // with the tag `Tag1`
+/// equalizer.get_bars(&audio1);
+///
+/// // Uncommenting this wouldn't compile
+/// // equalizer.get_bars(&audio2);
+/// ```
 pub struct AudioProcessor<Tag> {
     planner: RealFftPlanner<f32>,
     hann_window: Box<[f32]>,
@@ -26,6 +54,7 @@ pub struct AudioProcessor<Tag> {
 }
 
 impl<Tag> AudioProcessor<Tag> {
+    /// Create a new instance of this struct.
     pub fn new(fetcher: Box<dyn Fetcher>) -> Self {
         let fft_size = {
             let sample_rate = fetcher.sample_rate().0;
@@ -78,6 +107,11 @@ impl<Tag> AudioProcessor<Tag> {
         }
     }
 
+    /// Fetches the next batch of the internal fetcher and processes them.
+    /// The processed samples can be retrieved by using the [AudioProcessor::fft_out] method.
+    ///
+    /// # Example
+    /// See [AudioProcessor::fft_out].
     #[inline]
     pub fn process(&mut self) {
         self.fetch_new_samples();
@@ -100,20 +134,42 @@ impl<Tag> AudioProcessor<Tag> {
         .unwrap();
     }
 
+    /// Returns the processed samples of the last time you called [AudioProcessor:process].
+    ///
+    /// # Example
+    /// ```
+    /// use shady_audio::{AudioProcessor, fetcher::DummyFetcher};
+    ///
+    /// struct Tag;
+    ///
+    /// let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
+    ///
+    /// // fetch new samples and process them
+    /// audio.process();
+    ///
+    /// // get the processed output
+    /// let out = audio.fft_out().clone();
+    ///
+    /// // as long as you don't call `audio.process()` again, the last result will be returned
+    /// assert_eq!(out, audio.fft_out());
+    /// ```
     pub fn fft_out(&self) -> &[Complex32] {
         &self.fft_out
-    }
-
-    pub fn fft_size(&self) -> usize {
-        self.fft_size
-    }
-
-    pub fn sample_rate(&self) -> SampleRate {
-        self.fetcher.sample_rate()
     }
 
     fn fetch_new_samples(&mut self) {
         self.fetcher.fetch_samples(&mut self.sample_buffer);
         self.sample_buffer.clear();
+    }
+}
+
+// Crate internal public methods
+impl<T> AudioProcessor<T> {
+    pub(crate) fn fft_size(&self) -> usize {
+        self.fft_size
+    }
+
+    pub(crate) fn sample_rate(&self) -> SampleRate {
+        self.fetcher.sample_rate()
     }
 }
