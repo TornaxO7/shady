@@ -50,14 +50,20 @@ impl SampleBuffer {
     }
 }
 
+/// Errors which can occur while working with the [`SystemAudioFetcher`].
+///
+/// [`SystemAudioFetcher`]: crate::fetcher::SystemAudioFetcher
 #[derive(thiserror::Error, Debug, Clone, Copy)]
 pub enum SystemAudioError {
-    #[error("Couldn't retrieve default output dev")]
+    /// No default output device could be found.
+    #[error("Couldn't retrieve default output device")]
     NoDefaultDevice,
 
+    /// The given config of the output device didn't have the sample format `F32` as required.
     #[error("Expected sample format F32 but got {0} instead.")]
     InvalidSampleFormat(SampleFormat),
 
+    /// Couldn't retrieve the default config of the output stream of the default device.
     #[error("Couldn't retrieve default config of the output stream of the default device.")]
     NoDefaultOutputStreamConfig,
 }
@@ -144,13 +150,6 @@ impl SystemAudio {
     /// # Args
     /// - `error_callback` will be passed to the
     ///   `error_callback` of [`cpal::traits::DeviceTrait::build_input_stream`].
-    ///
-    /// # Example
-    /// ```no_run
-    /// use shady_audio::{ShadyAudio, config::ShadyAudioConfig, fetcher::SystemAudioFetcher};
-    ///
-    /// let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(), ShadyAudioConfig::default());
-    /// ```
     pub fn default<E>(error_callback: E) -> Result<Box<Self>, SystemAudioError>
     where
         E: FnMut(StreamError) + Send + 'static,

@@ -5,7 +5,7 @@ use realfft::{num_complex::Complex32, RealFftPlanner};
 
 use crate::fetcher::Fetcher;
 
-pub struct AudioProcessor<Name> {
+pub struct AudioProcessor<Tag> {
     planner: RealFftPlanner<f32>,
     hann_window: Box<[f32]>,
 
@@ -19,10 +19,10 @@ pub struct AudioProcessor<Name> {
     fetcher: Box<dyn Fetcher>,
     sample_buffer: Vec<f32>,
 
-    _phantom_data: PhantomData<Name>,
+    _phantom_data: PhantomData<Tag>,
 }
 
-impl<Name> AudioProcessor<Name> {
+impl<Tag> AudioProcessor<Tag> {
     pub fn new(fetcher: Box<dyn Fetcher>) -> Self {
         let fft_size = {
             let sample_rate = fetcher.sample_rate().0;

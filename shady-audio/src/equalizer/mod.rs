@@ -1,23 +1,28 @@
+//! Contains the equalizer which creates the bars from the output of the processor.
+pub mod config;
+
 use core::f32;
 use std::{marker::PhantomData, num::NonZeroUsize, ops::Range};
 
 use cpal::SampleRate;
 use tracing::debug;
 
-use crate::{
-    config::{self, EqualizerConfig},
-    processor::AudioProcessor,
-    MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
-};
+use crate::{processor::AudioProcessor, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
 
+/// The errors which can occur while configuring the [Equalizer].
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
-    #[error("There are not enough bars avai")]
-    NotEnoughBars {
-        amount_bins: usize,
-        amount_bars: usize,
-    },
+    /// The sample rate of the fetcher of the audio processor is too low.
+    ///
+    /// # The bigger context
+    /// The idea is here that the sample rate basically decides how many frequencies we
+    /// can distinguish so it musn't be lower than the amount of your requested bars for the equalizer.
+    #[error(
+        "The sample rate of the fetcher is too low. It must be at least {min_sample_rate} Hz."
+    )]
+    TooLowSampleRate { min_sample_rate: usize },
 
+    /// The given config is invalid.
     #[error(transparent)]
     InvalidConfig(#[from] config::Error),
 }
@@ -32,19 +37,27 @@ struct State {
     freq_range: Range<u32>,
 }
 
+/// The main struct to create the values for the bars from a processor.
+///
+/// The `Tag` generic forces you to use only one specifique audio processor instead of from multiple due to invariants.
 #[derive(Debug)]
-pub struct Equalizer<P> {
+pub struct Equalizer<Tag> {
     bar_values: Box<[f32]>,
     bar_ranges: Box<[Range<usize>]>,
     started_falling: Box<[bool]>,
 
     state: State,
 
-    _phantom_data: PhantomData<P>,
+    _phantom_data: PhantomData<Tag>,
 }
 
-impl<P> Equalizer<P> {
-    pub fn new(config: &EqualizerConfig, processor: &AudioProcessor<P>) -> Result<Self, Error> {
+impl<Tag> Equalizer<Tag> {
+    /// Create a new equalizer for the given audio processor.
+    pub fn new(
+        config: impl AsRef<config::Config>,
+        processor: &AudioProcessor<Tag>,
+    ) -> Result<Self, Error> {
+        let config = config.as_ref();
         assert!(
             processor.sample_rate().0 > 0,
             "fetcher has invalid sample rate of 0"
@@ -63,12 +76,40 @@ impl<P> Equalizer<P> {
         Self::inner_new(state)
     }
 
+    /// Update the amount of bars it should produce.
+    ///
+    /// # Example
+    /// ```rust
+    /// use shady_audio::{
+    ///     equalizer::{Equalizer, config::Config},
+    ///     fetcher::DummyFetcher,
+    ///     processor::AudioProcessor,
+    /// };
+    /// use std::num::NonZeroUsize;
+    ///
+    /// struct Tag;
+    ///
+    /// let amount_bars = 5;
+    ///
+    /// let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
+    /// let mut equalizer = Equalizer::new(Config {
+    ///         amount_bars: NonZeroUsize::new(amount_bars).unwrap(),
+    ///         ..Default::default()
+    ///     }, &audio
+    /// )
+    /// .unwrap();
+    ///
+    /// assert_eq!(equalizer.get_bars(&audio).len(), amount_bars);
+    /// ```
     pub fn set_bars(&mut self, amount_bars: NonZeroUsize) {
         self.state.amount_bars = usize::from(amount_bars);
         *self = Self::inner_new(self.state.clone()).unwrap();
     }
 
-    pub fn process(&mut self, audio: &AudioProcessor<P>) -> &[f32] {
+    /// Return the bars with their values.
+    ///
+    /// Each bar value tries to stay within the range `[0, 1]` but it could happen that there are some spikes which go above `1`. However it will slowly normalize itself back to `1`.
+    pub fn get_bars(&mut self, audio: &AudioProcessor<Tag>) -> &[f32] {
         let fft_out = audio.fft_out();
         let mut overshoot = false;
         let mut is_silent = true;
@@ -148,10 +189,9 @@ impl<P> Equalizer<P> {
             debug!("Bin range: {:?}", bin_range);
             debug!("Available bins: {}", amount_bins);
 
-            if amount_bins >= state.amount_bars {
-                return Err(Error::NotEnoughBars {
-                    amount_bins,
-                    amount_bars: state.amount_bars,
+            if amount_bins < state.amount_bars {
+                return Err(Error::TooLowSampleRate {
+                    min_sample_rate: state.fft_size,
                 });
             }
 

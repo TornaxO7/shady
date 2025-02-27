@@ -1,18 +1,28 @@
-use std::num::NonZeroUsize;
+use shady_audio::{
+    equalizer::{config::Config, Equalizer},
+    fetcher::DummyFetcher,
+    processor::AudioProcessor,
+};
 
-use shady_audio::{fetcher::DummyFetcher, ShadyAudio};
+struct Tag;
 
 fn main() {
-    let mut audio = ShadyAudio::new(
-        DummyFetcher::new(),
-        shady_audio::config::EqualizerConfig {
-            amount_bars: NonZeroUsize::new(5).unwrap(),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    // create the audio processors
+    let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
 
-    for _ in 0..1000 {
-        audio.get_bars();
-    }
+    // now create for each processor an equalizer
+    let mut equalizer = Equalizer::new(Config::default(), &audio).unwrap();
+
+    // let the processor process the next batch
+    audio.process();
+
+    // now you can retrieve the bars from the equalizer
+    equalizer.get_bars(&audio);
+
+    // NOTE: If you uncomment the lines after `==` it won't compile.
+    // `equalizer` is only allowed to process the data from the processor with the tag `Tag`.
+    // ===
+    // struct Tag2;
+    // let _audio2: AudioProcessor<Tag2> = AudioProcessor::new(DummyFetcher::new());
+    // equalizer.get_bars(&_audio2);
 }
