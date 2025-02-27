@@ -1,7 +1,7 @@
 use shady_audio::{
     equalizer::{config::EqualizerConfig, Equalizer},
     fetcher::DummyFetcher,
-    processor::AudioProcessor,
+    AudioProcessor,
 };
 
 struct Tag;

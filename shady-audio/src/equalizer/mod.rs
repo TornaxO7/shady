@@ -83,7 +83,7 @@ impl<Tag> Equalizer<Tag> {
     /// use shady_audio::{
     ///     equalizer::{Equalizer, config::EqualizerConfig},
     ///     fetcher::DummyFetcher,
-    ///     processor::AudioProcessor,
+    ///     AudioProcessor,
     /// };
     /// use std::num::NonZeroUsize;
     ///
@@ -109,6 +109,33 @@ impl<Tag> Equalizer<Tag> {
     /// Return the bars with their values.
     ///
     /// Each bar value tries to stay within the range `[0, 1]` but it could happen that there are some spikes which go above `1`. However it will slowly normalize itself back to `1`.
+    ///
+    /// # Example
+    /// ```rust
+    /// use shady_audio::{
+    ///     AudioProcessor,
+    ///     equalizer::{Equalizer, config::EqualizerConfig},
+    ///     fetcher::DummyFetcher,
+    /// };
+    /// use std::num::NonZeroUsize;
+    ///
+    ///
+    /// struct Tag;
+    ///
+    /// let amount_bars = 5;
+    /// let audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
+    /// let mut equalizer = Equalizer::new(
+    ///     EqualizerConfig {
+    ///         amount_bars: NonZeroUsize::new(amount_bars).unwrap(),
+    ///         ..Default::default()
+    ///     },
+    ///     &audio,
+    /// )
+    /// .unwrap();
+    ///
+    /// let bars = equalizer.get_bars(&audio);
+    /// assert_eq!(bars.len(), amount_bars);
+    /// ```
     pub fn get_bars(&mut self, audio: &AudioProcessor<Tag>) -> &[f32] {
         let fft_out = audio.fft_out();
         let mut overshoot = false;

@@ -12,15 +12,16 @@
 //! use shady_audio::{
 //!     equalizer::{Equalizer, config::EqualizerConfig},
 //!     fetcher::DummyFetcher,
-//!     processor::AudioProcessor,
+//!     AudioProcessor,
 //! };
 //!
+//! /// Give a tag per audio processor to avoid mixing up the equalizers with audo processors.
 //! struct Tag;
 //!
-//! // create the audio processors
+//! // create an audio processor.
 //! let mut audio: AudioProcessor<Tag> = AudioProcessor::new(DummyFetcher::new());
 //!
-//! // now create for each processor an equalizer
+//! // now create an equalizer for the given processor.
 //! let mut equalizer = Equalizer::new(EqualizerConfig::default(), &audio).unwrap();
 //!
 //! // let the processor process the next batch
@@ -38,13 +39,15 @@
 //! // let _audio2: AudioProcessor<Tag2> = AudioProcessor::new(DummyFetcher::new());
 //! // equalizer.get_bars(&_audio2);
 //! ```
+mod processor;
+
 pub mod equalizer;
 pub mod fetcher;
-pub mod processor;
-
-pub use cpal;
 
 use cpal::SampleRate;
+
+pub use cpal;
+pub use processor::AudioProcessor;
 
 type Hz = u32;
 
