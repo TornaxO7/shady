@@ -33,43 +33,41 @@ impl Equalizer {
         let started_falling = vec![false; amount_bars].into_boxed_slice();
 
         let bar_ranges = {
-            let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
-            debug!("Freq resolution: {}", freq_resolution);
-
             let weights = (0..amount_bars)
                 .map(|index| exp_fun(index as f32 / amount_bars as f32))
                 .collect::<Vec<f32>>();
             debug!("Weights: {:?}", weights);
 
-            // the relevant index range of the fft output which we should use for the bars
-            let bin_range = Range {
-                start: ((freq_range.start as f32 / freq_resolution) as usize).max(1),
-                end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
-            };
-            let amount_bins = bin_range.len();
-            debug!("Bin range: {:?}", bin_range);
-            debug!("Available bins: {}", amount_bins);
+            let amount_bins = {
+                let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
+                debug!("Freq resolution: {}", freq_resolution);
 
-            assert!(
-                amount_bins >= amount_bars,
-                "Not enough bins available (available: {}) for {} bars",
-                amount_bins,
-                amount_bars
-            );
+                // the relevant index range of the fft output which we should use for the bars
+                let bin_range = Range {
+                    start: ((freq_range.start as f32 / freq_resolution) as usize).max(1),
+                    end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
+                };
+                debug!("Bin range: {:?}", bin_range);
+                bin_range.len()
+            };
+            debug!("Available bins: {}", amount_bins);
 
             let ranges = {
                 let mut cut_offs = Vec::with_capacity(amount_bars);
+                // start of new interval
                 let mut start = 0;
+                let mut prev_end = 0;
 
                 for weight in weights {
-                    let mut end = ((weight / MAX_HUMAN_FREQUENCY as f32) * amount_bins as f32)
-                        .ceil() as usize;
-                    if start >= end {
-                        end = start + 1;
+                    let end = ((weight / MAX_HUMAN_FREQUENCY as f32) * amount_bins as f32).ceil()
+                        as usize;
+
+                    if !(prev_end..end).is_empty() {
+                        start = prev_end;
                     }
 
                     cut_offs.push(start..end);
-                    start = end;
+                    prev_end = end;
                 }
                 // let the last bar use every resulting bar
                 let last_range = cut_offs
