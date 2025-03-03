@@ -81,8 +81,8 @@ impl Default for ShadyAudioConfig {
     fn default() -> Self {
         Self {
             refresh_time: DEFAULT_REFRESH_TIME,
-            amount_bars: NonZeroUsize::new(32).unwrap(),
-            freq_range: NonZeroU32::new(50).unwrap()..NonZero::new(20_000).unwrap(),
+            amount_bars: NonZeroUsize::new(30).unwrap(),
+            freq_range: NonZeroU32::new(50).unwrap()..NonZero::new(10_000).unwrap(),
         }
     }
 }
