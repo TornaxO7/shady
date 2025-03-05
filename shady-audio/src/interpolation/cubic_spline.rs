@@ -21,6 +21,13 @@ impl InterpolationInstantiator for CubicSplineInterpolation {
         let ctx = InterpolationCtx::new(supporting_points);
         let values = vec![0f32; ctx.total_amount_entries()].into_boxed_slice();
 
+        if ctx.supporting_points.len() < 3 {
+            panic!(concat![
+                "I'm sorry to say this but currently it's required to have at least 3 supporting points for the cubic interpolation.\n",
+                "Please raise an issue so I can prioritize this issue"
+            ]);
+        }
+
         let section_widths = {
             let mut section_width = Vec::with_capacity(ctx.supporting_points.len() - 1);
 
