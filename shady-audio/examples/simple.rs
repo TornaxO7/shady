@@ -5,7 +5,7 @@ use shady_audio::{fetcher::DummyFetcher, ShadyAudio};
 fn main() {
     let mut audio = ShadyAudio::new(
         DummyFetcher::new(),
-        shady_audio::config::ShadyAudioConfig {
+        shady_audio::ShadyAudioConfig {
             amount_bars: NonZeroUsize::new(5).unwrap(),
             ..Default::default()
         },

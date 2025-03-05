@@ -147,7 +147,7 @@ impl SystemAudio {
     ///
     /// # Example
     /// ```no_run
-    /// use shady_audio::{ShadyAudio, config::ShadyAudioConfig, fetcher::SystemAudioFetcher};
+    /// use shady_audio::{ShadyAudio, ShadyAudioConfig, fetcher::SystemAudioFetcher};
     ///
     /// let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(), ShadyAudioConfig::default());
     /// ```

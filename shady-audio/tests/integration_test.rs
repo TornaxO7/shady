@@ -11,7 +11,7 @@ fn general() {
 
         ShadyAudio::new(
             fetcher,
-            shady_audio::config::ShadyAudioConfig {
+            shady_audio::ShadyAudioConfig {
                 amount_bars: NonZeroUsize::new(amount_bars).unwrap(),
                 ..Default::default()
             },

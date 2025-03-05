@@ -33,6 +33,7 @@ impl InterpolationInstantiator for CubicSplineInterpolation {
 
             section_width.into_boxed_slice()
         };
+
         let amount_sections = section_widths.len();
 
         let matrix = get_matrix(&section_widths);
@@ -125,6 +126,7 @@ impl Interpolater for CubicSplineInterpolation {
 
 fn get_matrix(section_widths: &[usize]) -> Cholesky<f32, Dyn> {
     let amount_widths = section_widths.len();
+
     let mut matrix = DMatrix::zeros(amount_widths, amount_widths);
 
     // add first row

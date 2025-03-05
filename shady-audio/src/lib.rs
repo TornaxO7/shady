@@ -15,7 +15,7 @@
 //! ```rust
 //! use std::num::NonZeroUsize;
 //!
-//! use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+//! use shady_audio::{ShadyAudio, fetcher::DummyFetcher, ShadyAudioConfig};
 //!
 //! let mut audio = {
 //!     // A fetcher feeds new samples to `ShadyAudio` which processes it
@@ -83,7 +83,7 @@ pub enum Error {
     ///
     /// # Example
     /// ```rust
-    /// use shady_audio::{Error, config::ShadyAudioConfig};
+    /// use shady_audio::{Error, ShadyAudioConfig};
     /// use std::num::NonZeroU32;
     ///
     /// let invalid_range = NonZeroU32::new(10).unwrap()..NonZeroU32::new(10).unwrap();
@@ -124,7 +124,7 @@ impl ShadyAudio {
     ///
     /// # Example
     /// ```
-    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, ShadyAudioConfig};
     ///
     /// let shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
     /// ```
@@ -177,7 +177,7 @@ impl ShadyAudio {
     ///
     /// # Example
     /// ```
-    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, ShadyAudioConfig};
     /// use std::num::NonZeroUsize;
     ///
     /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default()).unwrap();
@@ -223,7 +223,7 @@ impl ShadyAudio {
     ///
     /// # Example
     /// ```
-    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, ShadyAudioConfig};
     ///
     /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default()).unwrap();
     ///
@@ -241,7 +241,7 @@ impl ShadyAudio {
     ///
     /// # Example
     /// ```
-    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, config::ShadyAudioConfig};
+    /// use shady_audio::{ShadyAudio, fetcher::DummyFetcher, ShadyAudioConfig};
     /// use std::num::NonZeroU32;
     ///
     /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default()).unwrap();

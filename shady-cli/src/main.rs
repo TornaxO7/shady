@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 use shady_audio::{
-    config::ShadyAudioConfig, fetcher::SystemAudioFetcher, InterpolationVariant, ShadyAudio,
+    fetcher::SystemAudioFetcher, InterpolationVariant, ShadyAudio, ShadyAudioConfig,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 

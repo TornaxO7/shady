@@ -10,7 +10,7 @@ use crate::{interpolation::InterpolationVariant, Error};
 ///
 /// # Example
 /// ```rust
-/// use shady_audio::{fetcher::DummyFetcher, ShadyAudio, config::ShadyAudioConfig};
+/// use shady_audio::{fetcher::DummyFetcher, ShadyAudio, ShadyAudioConfig};
 /// use std::time::Duration;
 ///
 /// let mut shady_audio = ShadyAudio::new(DummyFetcher::new(), ShadyAudioConfig::default());
@@ -26,7 +26,7 @@ pub struct ShadyAudioConfig {
     ///
     /// # Example
     /// ```rust
-    /// use shady_audio::config::ShadyAudioConfig;
+    /// use shady_audio::ShadyAudioConfig;
     /// use std::num::NonZeroU32;
     ///
     /// let config = ShadyAudioConfig {
