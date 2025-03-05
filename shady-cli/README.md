@@ -13,6 +13,7 @@ The keybindings are:
 
 - `+` to increase the width of the bars which also decreases the amount of bars since the space becomes smaller
 - `-` to decrease the width of the bars which also increase the amount of bars since the space becomes bigger
+- `i` toggle between interpolations (`Cubic Interpolation` -> `None` -> `Linear Interpolation`)
 - `q` to quit
 
 There are also some arguments. Take a look at the help page (`-h` or `--help`).
