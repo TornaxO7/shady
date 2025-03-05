@@ -1,3 +1,5 @@
+//! Everything related to the interpolation calculation.
+
 mod context;
 mod cubic_spline;
 mod linear;

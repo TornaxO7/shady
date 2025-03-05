@@ -43,11 +43,11 @@
 //! ```
 pub mod config;
 pub mod fetcher;
-pub mod interpolation;
 
 mod equalizer;
 mod error;
 mod fft;
+mod interpolation;
 
 type Hz = u32;
 
@@ -64,13 +64,13 @@ pub const MAX_HUMAN_FREQUENCY: Hz = 20_000;
 pub const DEFAULT_SAMPLE_RATE: SampleRate = SampleRate(44_100);
 
 pub use cpal;
+pub use interpolation::InterpolationVariant;
 
 use config::ShadyAudioConfig;
 use cpal::SampleRate;
 use equalizer::Equalizer;
 use fetcher::Fetcher;
 use fft::FftCalculator;
-use interpolation::InterpolationVariant;
 use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::Range,
