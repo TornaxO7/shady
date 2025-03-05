@@ -41,9 +41,9 @@
 //! audio.set_bars(NonZeroUsize::new(20).unwrap());
 //! assert_eq!(audio.get_bars().len(), 20);
 //! ```
-pub mod config;
 pub mod fetcher;
 
+mod config;
 mod equalizer;
 mod error;
 mod fft;
@@ -63,10 +63,10 @@ pub const MAX_HUMAN_FREQUENCY: Hz = 20_000;
 /// Fetchers are allowed to use this for orientation.
 pub const DEFAULT_SAMPLE_RATE: SampleRate = SampleRate(44_100);
 
+pub use config::ShadyAudioConfig;
 pub use cpal;
 pub use interpolation::InterpolationVariant;
 
-use config::ShadyAudioConfig;
 use cpal::SampleRate;
 use equalizer::Equalizer;
 use fetcher::Fetcher;

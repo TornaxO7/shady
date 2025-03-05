@@ -1,6 +1,3 @@
-//! Module to configure the behaviour of [ShadyAudio].
-//!
-//! [ShadyAudio]: crate::ShadyAudio
 use std::{
     num::{NonZero, NonZeroU32, NonZeroUsize},
     ops::Range,
