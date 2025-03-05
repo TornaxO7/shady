@@ -4,16 +4,9 @@
 use std::{
     num::{NonZero, NonZeroU32, NonZeroUsize},
     ops::Range,
-    time::Duration,
 };
 
 use crate::Error;
-
-/// Default value for [ShadyAudioConfig.refresh_time].
-/// Set to `100` millis.
-///
-/// [ShadyAudioConfig.refresh_time]: struct.ShadyAudioConfig.html#structfield.refresh_time
-pub const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
 
 /// Configure the behaviour of [ShadyAudio] by setting the appropriate values in this struct
 /// and give it to [ShadyAudio].
@@ -29,16 +22,6 @@ pub const DEFAULT_REFRESH_TIME: Duration = Duration::from_millis(100);
 /// [ShadyAudio]: crate::ShadyAudio
 #[derive(Debug, Clone, Hash)]
 pub struct ShadyAudioConfig {
-    /// The duration how long shady should wait, until it should fetch
-    /// from the audio source again.
-    ///
-    /// The rule is basically: The higher the duration, the slower your
-    /// music visualizer becomes.
-    ///
-    /// # Default
-    /// See [DEFAULT_REFRESH_TIME
-    pub refresh_time: Duration,
-
     /// Set the amount bars which should be used.
     pub amount_bars: NonZeroUsize,
 
@@ -80,7 +63,6 @@ impl ShadyAudioConfig {
 impl Default for ShadyAudioConfig {
     fn default() -> Self {
         Self {
-            refresh_time: DEFAULT_REFRESH_TIME,
             amount_bars: NonZeroUsize::new(30).unwrap(),
             freq_range: NonZeroU32::new(50).unwrap()..NonZero::new(10_000).unwrap(),
         }
