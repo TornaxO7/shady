@@ -136,15 +136,12 @@ fn get_matrix(section_widths: &[usize]) -> Cholesky<f32, Dyn> {
 
     // add rows in between
     {
-        let mut offset = 0;
-        for row_idx in 1..(amount_widths - 1) {
+        for (offset, row_idx) in (1..(amount_widths - 1)).enumerate() {
             let mut row = matrix.row_mut(row_idx);
 
             row[offset] = section_widths[offset] as f32;
             row[offset + 1] = 2. * (section_widths[offset] + section_widths[offset + 1]) as f32;
             row[offset + 2] = section_widths[offset + 1] as f32;
-
-            offset += 1;
         }
     }
 
@@ -158,7 +155,7 @@ fn get_matrix(section_widths: &[usize]) -> Cholesky<f32, Dyn> {
 
     ((1. / 6.) * matrix.clone())
         .cholesky()
-        .expect(&format!("Hold up! Looks like my numeric knowledge isn't really numericing ;-----;\nThe matrix which got calculated is: {}", matrix))
+        .unwrap_or_else( || panic!("Hold up! Looks like my numeric knowledge isn't really numericing ;-----;\nThe matrix which got calculated is: {}", matrix))
 }
 
 #[cfg(test)]

@@ -128,7 +128,6 @@ impl Equalizer {
         for (supporting_point, info) in self
             .interpolator
             .supporting_points_mut()
-            .into_iter()
             .zip(self.supporting_point_infos.iter_mut())
         {
             let x = supporting_point.x;

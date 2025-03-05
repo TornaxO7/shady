@@ -83,7 +83,7 @@ impl std::fmt::Debug for InterpolationCtx {
                 (None, None) => break,
             };
 
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
 
         Ok(())
