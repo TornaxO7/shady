@@ -1,11 +1,11 @@
 mod context;
-mod nothing;
-// mod cubic_spline;
+mod cubic_spline;
 mod linear;
+mod nothing;
 
 use std::slice::IterMut;
 
-// pub use cubic_spline::CubicSplineInterpolation;
+pub use cubic_spline::CubicSplineInterpolation;
 pub use linear::LinearInterpolation;
 pub use nothing::NothingInterpolation;
 

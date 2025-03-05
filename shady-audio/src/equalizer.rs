@@ -7,7 +7,7 @@ use tracing::{debug, instrument};
 
 use crate::{
     interpolation::{
-        Interpolater, InterpolationInstantiator, LinearInterpolation, SupportingPoint,
+        CubicSplineInterpolation, Interpolater, InterpolationInstantiator, SupportingPoint,
     },
     Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
 };
@@ -95,7 +95,7 @@ impl Equalizer {
             (supporting_points, supporting_point_infos.into_boxed_slice())
         };
 
-        let interpolator = LinearInterpolation::boxed(supporting_points);
+        let interpolator = CubicSplineInterpolation::boxed(supporting_points);
 
         Self {
             supporting_point_infos,
