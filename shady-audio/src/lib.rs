@@ -43,6 +43,7 @@
 //! ```
 pub mod config;
 pub mod fetcher;
+pub mod interpolation;
 
 mod equalizer;
 mod error;
