@@ -7,7 +7,8 @@ use tracing::{debug, instrument};
 
 use crate::{
     interpolation::{
-        CubicSplineInterpolation, Interpolater, InterpolationInstantiator, SupportingPoint,
+        CubicSplineInterpolation, Interpolater, InterpolationInstantiator, InterpolationVariant,
+        LinearInterpolation, NothingInterpolation, SupportingPoint,
     },
     Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
 };
@@ -37,6 +38,7 @@ pub struct Equalizer {
 
     supporting_point_infos: Box<[SupportingPointInfo]>,
     interpolator: Box<dyn Interpolater>,
+    interpolation: InterpolationVariant,
 }
 
 impl Equalizer {
@@ -47,6 +49,7 @@ impl Equalizer {
         sample_len: usize, // = fft size
         sample_rate: SampleRate,
         init_sensitivity: Option<f32>,
+        interpolation: InterpolationVariant,
     ) -> Self {
         assert!(sample_rate.0 > 0);
 
@@ -95,12 +98,17 @@ impl Equalizer {
             (supporting_points, supporting_point_infos.into_boxed_slice())
         };
 
-        let interpolator = CubicSplineInterpolation::boxed(supporting_points);
+        let interpolator: Box<dyn Interpolater> = match interpolation {
+            InterpolationVariant::None => NothingInterpolation::boxed(supporting_points),
+            InterpolationVariant::Linear => LinearInterpolation::boxed(supporting_points),
+            InterpolationVariant::CubicSpline => CubicSplineInterpolation::boxed(supporting_points),
+        };
 
         Self {
             supporting_point_infos,
             sensitivity: init_sensitivity.unwrap_or(DEFAULT_INIT_SENSITIVITY),
             interpolator,
+            interpolation,
         }
     }
 
@@ -117,6 +125,10 @@ impl Equalizer {
 
     pub fn sensitivity(&self) -> f32 {
         self.sensitivity
+    }
+
+    pub fn interpolation(&self) -> InterpolationVariant {
+        self.interpolation
     }
 
     fn update_supporting_points(&mut self, fft_out: &[Complex32]) -> (bool, bool) {
@@ -176,165 +188,6 @@ impl Equalizer {
 
         (overshoot, is_silent)
     }
-
-    // fn process_cubic_spline_interpolation(&mut self) {
-    //     let section_widths = {
-    //         let mut section_width = Vec::with_capacity(self.supporting_points.len() - 1);
-
-    //         let mut prev_width = self.supporting_points[0].x;
-    //         for anchor in self.supporting_points[1..].iter() {
-    //             let width = anchor.x - prev_width;
-    //             prev_width = anchor.x;
-
-    //             assert!(width > 0);
-
-    //             section_width.push(width);
-    //         }
-
-    //         section_width
-    //     };
-    //     let amount_sections = section_widths.len();
-    //     debug_assert!(amount_sections + 1 == self.supporting_points.len());
-    //     debug!("Section widths:\n{:?}", section_widths);
-
-    //     let matrix = {
-    //         let mut matrix = DMatrix::zeros(amount_sections, amount_sections);
-
-    //         // add first row
-    //         {
-    //             let mut first_row = matrix.row_mut(0);
-    //             first_row[0] = 2. * section_widths[0] as f32;
-    //             first_row[1] = section_widths[0] as f32;
-    //         }
-
-    //         // add rows in between
-    //         {
-    //             let mut offset = 0;
-    //             for row_idx in 1..(amount_sections - 1) {
-    //                 let mut row = matrix.row_mut(row_idx);
-
-    //                 row[offset] = section_widths[offset] as f32;
-    //                 row[offset + 1] =
-    //                     2. * (section_widths[offset] + section_widths[offset + 1]) as f32;
-    //                 row[offset + 2] = section_widths[offset + 1] as f32;
-
-    //                 offset += 1;
-    //             }
-    //         }
-
-    //         // add last row
-    //         {
-    //             let mut last_row = matrix.row_mut(amount_sections - 1);
-
-    //             last_row[amount_sections - 2] = section_widths[amount_sections - 1] as f32;
-    //             last_row[amount_sections - 1] = 2. * section_widths[amount_sections - 1] as f32;
-    //         }
-
-    //         // just for debugging purposes
-    //         {
-    //             let mut dbg_matrix_msg = String::new();
-    //             for row_idx in 0..amount_sections {
-    //                 let row = matrix.row(row_idx);
-    //                 write!(&mut dbg_matrix_msg, "[").unwrap();
-    //                 for &value in row.columns_range(..amount_sections - 1) {
-    //                     write!(&mut dbg_matrix_msg, "{value}, ").unwrap();
-    //                 }
-    //                 write!(&mut dbg_matrix_msg, "{}]\n", row[amount_sections - 1]).unwrap();
-    //             }
-    //             debug!("Matrix:\n{}", dbg_matrix_msg)
-    //         }
-
-    //         matrix * (1. / 6.)
-    //     };
-    //     debug_assert_eq!(matrix.row(0).len(), amount_sections);
-    //     debug_assert_eq!(matrix.column(0).len(), amount_sections);
-
-    //     let gradients = {
-    //         let mut gradients = Vec::with_capacity(amount_sections);
-
-    //         for (i, right) in self.supporting_points[1..].iter().enumerate() {
-    //             let left = &self.supporting_points[i];
-    //             let left_x = left.x;
-    //             let left_y = self.bar_values[left_x];
-
-    //             let right_x = right.x;
-    //             let right_y = self.bar_values[right_x];
-
-    //             let gradient = (left_y - right_y) / (left_x as f32 - right_x as f32);
-
-    //             gradients.push(gradient);
-    //         }
-
-    //         gradients
-    //     };
-    //     debug_assert_eq!(gradients.len(), amount_sections);
-    //     debug!("Gradients: {:?}", gradients);
-
-    //     let gradient_diffs = {
-    //         let mut gradient_diffs = Vec::with_capacity(amount_sections);
-
-    //         // first diff
-    //         gradient_diffs.push(gradients[0]);
-
-    //         // d1 to d(N - 1)
-    //         for (i, next_gradient) in gradients[1..gradients.len() - 1]
-    //             .iter()
-    //             .cloned()
-    //             .enumerate()
-    //         {
-    //             let prev_gradient = gradients[i];
-
-    //             gradient_diffs.push(next_gradient - prev_gradient);
-    //         }
-
-    //         // last diff
-    //         gradient_diffs.push(gradients[gradients.len() - 1]);
-
-    //         gradient_diffs
-    //     };
-    //     debug_assert_eq!(gradient_diffs.len(), amount_sections);
-
-    //     let l = matrix
-    //         .cholesky()
-    //         .expect("Hold up! Looks like I failed my numeric exam... ;------;");
-    //     let gammas = l.solve(&DVector::from_row_slice(gradient_diffs.as_slice()));
-    //     debug_assert_eq!(gammas.len(), amount_sections);
-
-    //     // now let's do the actual calculation
-    //     for section in self.interpolation_sections.iter() {
-    //         let n = section.ending_supporting_point_idx;
-
-    //         let prev_supporting_point = &self.supporting_points[n - 1];
-    //         let prev_x = prev_supporting_point.x;
-    //         let prev_y = self.bar_values[prev_x];
-    //         let prev_gamma = gammas[n - 1];
-
-    //         let next_supporting_point = &self.supporting_points[n];
-    //         let next_x = next_supporting_point.x;
-    //         let next_gamma = gammas[n];
-
-    //         let gradient = gradients[n - 1];
-    //         let section_width = section_widths[n - 1];
-
-    //         let amount = usize::from(section.amount);
-    //         for idx in 0..amount {
-    //             let idx = usize::from(idx);
-
-    //             let x = (idx + 1 + prev_x) as f32;
-
-    //             let interpolated_value = prev_y
-    //                 + (x - prev_x as f32) * gradient
-    //                 + ((x - prev_x as f32) * (x - next_x as f32)) / (6. * section_width as f32)
-    //                     * ((prev_gamma + 2. * next_gamma) * (x - prev_x as f32)
-    //                         - (2. * prev_gamma + next_gamma) * (x - next_x as f32));
-
-    //             self.bar_values[section.start + idx] = interpolated_value;
-    //             debug!("Interpolated values: {}", interpolated_value);
-    //         }
-    //     }
-    // }
-
-    // }
 }
 
 fn exp_fun(x: f32) -> f32 {

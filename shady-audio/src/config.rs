@@ -6,7 +6,7 @@ use std::{
     ops::Range,
 };
 
-use crate::Error;
+use crate::{interpolation::InterpolationVariant, Error};
 
 /// Configure the behaviour of [ShadyAudio] by setting the appropriate values in this struct
 /// and give it to [ShadyAudio].
@@ -39,6 +39,9 @@ pub struct ShadyAudioConfig {
     /// };
     /// ```
     pub freq_range: Range<NonZeroU32>,
+
+    /// Decide which interpolation should be used for the bars.
+    pub interpolation: InterpolationVariant,
 }
 
 impl ShadyAudioConfig {
@@ -65,6 +68,7 @@ impl Default for ShadyAudioConfig {
         Self {
             amount_bars: NonZeroUsize::new(30).unwrap(),
             freq_range: NonZeroU32::new(50).unwrap()..NonZero::new(10_000).unwrap(),
+            interpolation: InterpolationVariant::CubicSpline,
         }
     }
 }

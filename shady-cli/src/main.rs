@@ -7,7 +7,10 @@ use ratatui::{
     widgets::{Bar, BarChart, BarGroup},
     Frame,
 };
-use shady_audio::{config::ShadyAudioConfig, fetcher::SystemAudioFetcher, ShadyAudio};
+use shady_audio::{
+    config::ShadyAudioConfig, fetcher::SystemAudioFetcher, interpolation::InterpolationVariant,
+    ShadyAudio,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 const HEIGHT: u64 = 1000;
@@ -26,6 +29,7 @@ struct Ctx<'a> {
     color: Color,
 
     audio: ShadyAudio,
+    interpolation: InterpolationVariant,
 }
 
 impl<'a> Ctx<'a> {
@@ -53,6 +57,16 @@ impl<'a> Ctx<'a> {
 
         self.bars.as_slice()
     }
+
+    fn next_interpolation(&mut self) {
+        self.interpolation = match self.interpolation {
+            InterpolationVariant::None => InterpolationVariant::Linear,
+            InterpolationVariant::Linear => InterpolationVariant::CubicSpline,
+            InterpolationVariant::CubicSpline => InterpolationVariant::None,
+        };
+
+        self.audio.set_interopaltion_variant(self.interpolation);
+    }
 }
 
 fn main() -> std::io::Result<()> {
@@ -68,6 +82,7 @@ fn main() -> std::io::Result<()> {
             ShadyAudioConfig::default(),
         )
         .unwrap(),
+        interpolation: InterpolationVariant::CubicSpline,
     };
 
     let mut terminal = ratatui::init();
@@ -95,6 +110,9 @@ fn main() -> std::io::Result<()> {
                     KeyCode::Char('-') => {
                         ctx.bar_width = 1.max(ctx.bar_width - 1);
                         ctx.set_bars(window_size.columns);
+                    }
+                    KeyCode::Char('i') => {
+                        ctx.next_interpolation();
                     }
                     _ => {}
                 }

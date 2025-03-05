@@ -70,6 +70,7 @@ use cpal::SampleRate;
 use equalizer::Equalizer;
 use fetcher::Fetcher;
 use fft::FftCalculator;
+use interpolation::InterpolationVariant;
 use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::Range,
@@ -105,6 +106,7 @@ struct State {
     sample_rate: SampleRate,
     freq_range: Range<Hz>,
     sensitivity: f32,
+    interpolation: InterpolationVariant,
 }
 
 /// The main struct to interact with the crate.
@@ -134,6 +136,7 @@ impl ShadyAudio {
             sample_rate: fetcher.sample_rate(),
             freq_range: Hz::from(config.freq_range.start)..Hz::from(config.freq_range.end),
             sensitivity: 1.,
+            interpolation: config.interpolation,
         };
 
         let sample_buffer = Vec::with_capacity(state.sample_rate.0 as usize);
@@ -144,6 +147,7 @@ impl ShadyAudio {
             fft.size(),
             state.sample_rate,
             Some(state.sensitivity),
+            state.interpolation,
         );
 
         Ok(Self {
@@ -189,6 +193,7 @@ impl ShadyAudio {
         self.state.amount_bars = usize::from(amount_bars);
 
         self.state.sensitivity = self.equalizer.sensitivity();
+        self.state.interpolation = self.equalizer.interpolation();
 
         self.equalizer = Equalizer::new(
             self.state.amount_bars,
@@ -196,6 +201,21 @@ impl ShadyAudio {
             self.fft.size(),
             self.state.sample_rate,
             Some(self.state.sensitivity),
+            self.state.interpolation,
+        );
+    }
+
+    #[inline]
+    pub fn set_interopaltion_variant(&mut self, interpolation: InterpolationVariant) {
+        self.state.interpolation = interpolation;
+
+        self.equalizer = Equalizer::new(
+            self.state.amount_bars,
+            self.state.freq_range.clone(),
+            self.fft.size(),
+            self.state.sample_rate,
+            Some(self.state.sensitivity),
+            self.state.interpolation,
         );
     }
 
@@ -246,6 +266,7 @@ impl ShadyAudio {
             self.fft.size(),
             self.state.sample_rate,
             Some(self.state.sensitivity),
+            self.state.interpolation,
         );
 
         Ok(())
