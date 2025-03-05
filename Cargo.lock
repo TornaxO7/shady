@@ -2586,7 +2586,7 @@ dependencies = [
 
 [[package]]
 name = "shady-audio"
-version = "4.0.3"
+version = "5.0.0"
 dependencies = [
  "apodize",
  "cpal",
