@@ -5,17 +5,40 @@ use cpal::SampleRate;
 use realfft::num_complex::Complex32;
 use tracing::{debug, instrument};
 
-use crate::{Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY};
+use crate::{
+    interpolation::{
+        CubicSplineInterpolation, Interpolater, InterpolationInstantiator, InterpolationVariant,
+        LinearInterpolation, NothingInterpolation, SupportingPoint,
+    },
+    Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
+};
 
 const DEFAULT_INIT_SENSITIVITY: f32 = 1.;
 
+/// Additional information about the supporting points
 #[derive(Debug)]
-pub struct Equalizer {
-    bar_values: Box<[f32]>,
-    bar_ranges: Box<[Range<usize>]>,
-    started_falling: Box<[bool]>,
+struct SupportingPointInfo {
+    /// which fft bins of the fft output should be used for the given bar
+    fft_bin_range: Range<usize>,
+    /// if the bar just started falling
+    started_falling: bool,
+}
 
+impl SupportingPointInfo {
+    pub fn new(fft_bin_range: Range<usize>) -> Self {
+        Self {
+            fft_bin_range,
+            started_falling: false,
+        }
+    }
+}
+
+pub struct Equalizer {
     sensitivity: f32,
+
+    supporting_point_infos: Box<[SupportingPointInfo]>,
+    interpolator: Box<dyn Interpolater>,
+    interpolation: InterpolationVariant,
 }
 
 impl Equalizer {
@@ -26,80 +49,103 @@ impl Equalizer {
         sample_len: usize, // = fft size
         sample_rate: SampleRate,
         init_sensitivity: Option<f32>,
+        interpolation: InterpolationVariant,
     ) -> Self {
         assert!(sample_rate.0 > 0);
 
-        let bar_values = vec![0.; amount_bars].into_boxed_slice();
-        let started_falling = vec![false; amount_bars].into_boxed_slice();
+        let (supporting_points, supporting_point_infos) = {
+            let mut supporting_points = Vec::new();
+            let mut supporting_point_infos = Vec::with_capacity(amount_bars);
 
-        let bar_ranges = {
-            let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
-            debug!("Freq resolution: {}", freq_resolution);
-
+            // == preparations
             let weights = (0..amount_bars)
-                .map(|index| exp_fun(index as f32 / amount_bars as f32))
+                .map(|index| exp_fun((index + 1) as f32 / (amount_bars + 1) as f32))
                 .collect::<Vec<f32>>();
             debug!("Weights: {:?}", weights);
 
-            // the relevant index range of the fft output which we should use for the bars
-            let bin_range = Range {
-                start: ((freq_range.start as f32 / freq_resolution) as usize).max(1),
-                end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
+            let amount_bins = {
+                let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
+                debug!("Freq resolution: {}", freq_resolution);
+
+                // the relevant index range of the fft output which we should use for the bars
+                let bin_range = Range {
+                    start: ((freq_range.start as f32 / freq_resolution) as usize).max(1),
+                    end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
+                };
+                debug!("Bin range: {:?}", bin_range);
+                bin_range.len()
             };
-            let amount_bins = bin_range.len();
-            debug!("Bin range: {:?}", bin_range);
             debug!("Available bins: {}", amount_bins);
 
-            assert!(
-                amount_bins >= amount_bars,
-                "Not enough bins available (available: {}) for {} bars",
-                amount_bins,
-                amount_bars
-            );
+            // == calculate sections
+            let mut prev_fft_range = 0..0;
+            for (bar_idx, weight) in weights.iter().enumerate() {
+                let end =
+                    ((weight / MAX_HUMAN_FREQUENCY as f32) * amount_bins as f32).ceil() as usize;
 
-            let ranges = {
-                let mut cut_offs = Vec::with_capacity(amount_bars);
-                let mut start = 0;
+                let new_fft_range = prev_fft_range.end..end;
+                let is_supporting_point =
+                    new_fft_range != prev_fft_range && !new_fft_range.is_empty();
+                if is_supporting_point {
+                    supporting_points.push(SupportingPoint { x: bar_idx, y: 0. });
 
-                for weight in weights {
-                    let mut end = ((weight / MAX_HUMAN_FREQUENCY as f32) * amount_bins as f32)
-                        .ceil() as usize;
-                    if start >= end {
-                        end = start + 1;
-                    }
-
-                    cut_offs.push(start..end);
-                    start = end;
+                    supporting_point_infos.push(SupportingPointInfo::new(new_fft_range.clone()));
                 }
-                // let the last bar use every resulting bar
-                let last_range = cut_offs
-                    .last_mut()
-                    .expect("There's at least one range/bar.");
-                last_range.end = amount_bins;
 
-                cut_offs
-            };
-            tracing::debug!("Bin ranges: {:?}", ranges);
+                prev_fft_range = new_fft_range;
+            }
 
-            ranges.into_boxed_slice()
+            (supporting_points, supporting_point_infos.into_boxed_slice())
+        };
+
+        let interpolator: Box<dyn Interpolater> = match interpolation {
+            InterpolationVariant::None => NothingInterpolation::boxed(supporting_points),
+            InterpolationVariant::Linear => LinearInterpolation::boxed(supporting_points),
+            InterpolationVariant::CubicSpline => CubicSplineInterpolation::boxed(supporting_points),
         };
 
         Self {
-            bar_values,
-            bar_ranges,
-            started_falling,
+            supporting_point_infos,
             sensitivity: init_sensitivity.unwrap_or(DEFAULT_INIT_SENSITIVITY),
+            interpolator,
+            interpolation,
         }
     }
 
     pub fn process(&mut self, fft_out: &[Complex32]) -> &[f32] {
+        let (overshoot, is_silent) = self.update_supporting_points(fft_out);
+        if overshoot {
+            self.sensitivity *= 0.98;
+        } else if !is_silent {
+            self.sensitivity *= 1.002;
+        }
+
+        self.interpolator.interpolate()
+    }
+
+    pub fn sensitivity(&self) -> f32 {
+        self.sensitivity
+    }
+
+    pub fn interpolation(&self) -> InterpolationVariant {
+        self.interpolation
+    }
+
+    fn update_supporting_points(&mut self, fft_out: &[Complex32]) -> (bool, bool) {
         let mut overshoot = false;
         let mut is_silent = true;
 
-        for (i, range) in self.bar_ranges.iter().cloned().enumerate() {
-            let prev_magnitude = self.bar_values[i];
-            let next_magnitude: f32 = {
-                let raw_bar_val = fft_out[range]
+        let amount_bars = self.interpolator.total_amount_entries();
+
+        for (supporting_point, info) in self
+            .interpolator
+            .supporting_points_mut()
+            .zip(self.supporting_point_infos.iter_mut())
+        {
+            let x = supporting_point.x;
+            let prev_magnitude = supporting_point.y;
+            let next_magnitude = {
+                let raw_bar_val = fft_out[info.fft_bin_range.clone()]
                     .iter()
                     .map(|out| {
                         let mag = out.norm();
@@ -111,9 +157,7 @@ impl Equalizer {
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap();
 
-                self.sensitivity
-                    * raw_bar_val
-                    * 10f32.powf((i as f32 / self.bar_values.len() as f32) - 1.1)
+                self.sensitivity * raw_bar_val * 10f32.powf((x as f32 / amount_bars as f32) - 1.1)
             };
 
             debug_assert!(!prev_magnitude.is_nan());
@@ -121,36 +165,28 @@ impl Equalizer {
 
             let rel_change = next_magnitude / prev_magnitude;
             if is_silent {
-                self.bar_values[i] *= 0.75;
-                self.started_falling[i] = false;
+                supporting_point.y *= 0.75;
+                info.started_falling = false;
             } else {
-                let was_already_falling = self.started_falling[i];
-                if next_magnitude < prev_magnitude && !was_already_falling {
-                    self.started_falling[i] = true;
-                    self.bar_values[i] += (next_magnitude - prev_magnitude) * 0.1;
+                let was_falling_before = info.started_falling;
+                let is_falling = next_magnitude < prev_magnitude;
+
+                if is_falling && !was_falling_before {
+                    info.started_falling = true;
+                    supporting_point.y += (next_magnitude - prev_magnitude) * 0.1;
                 } else {
-                    self.started_falling[i] = false;
-                    self.bar_values[i] +=
+                    info.started_falling = false;
+                    supporting_point.y +=
                         (next_magnitude - prev_magnitude) * rel_change.clamp(0.05, 0.2);
                 }
             }
 
-            if self.bar_values[i] > 1. {
+            if supporting_point.y > 1. {
                 overshoot = true;
             }
         }
 
-        if overshoot {
-            self.sensitivity *= 0.98;
-        } else if !is_silent {
-            self.sensitivity *= 1.002;
-        }
-
-        &self.bar_values
-    }
-
-    pub fn sensitivity(&self) -> f32 {
-        self.sensitivity
+        (overshoot, is_silent)
     }
 }
 
