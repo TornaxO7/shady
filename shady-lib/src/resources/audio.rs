@@ -5,9 +5,8 @@ use std::{
 };
 
 use shady_audio::{
-    config::ShadyAudioConfig,
     fetcher::{Fetcher, SystemAudioFetcher},
-    ShadyAudio,
+    ShadyAudio, ShadyAudioConfig,
 };
 use wgpu::Device;
 
