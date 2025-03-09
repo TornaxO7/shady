@@ -17,9 +17,6 @@
         perSystem = { self', lib, system, pkgs, config, ... }:
           let
             dependencies = with pkgs; [
-
-              pkg-config
-
               xorg.libX11
               xorg.libxcb
               xorg.libXi
@@ -61,7 +58,10 @@
               pkgs.mkShell rec {
                 packages = [ rust-toolchain inputs.cargo-watchdoc.packages.${system}.default ]
                   ++ (with pkgs; [ cargo-flamegraph cargo-release cargo-dist ]);
+
+
                 buildInputs = dependencies;
+                nativeBuildInputs = with pkgs; [ pkg-config ];
 
                 shellHook = ''
                   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${lib.makeLibraryPath buildInputs}
