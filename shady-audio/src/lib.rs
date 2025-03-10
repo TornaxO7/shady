@@ -15,7 +15,6 @@
 pub mod bar_processor;
 pub mod fetcher;
 
-mod error;
 mod interpolation;
 mod sample_processor;
 
