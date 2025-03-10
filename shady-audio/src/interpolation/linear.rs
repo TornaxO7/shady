@@ -2,7 +2,7 @@ use std::slice::IterMut;
 
 use tracing::debug;
 
-use super::{context::InterpolationCtx, Interpolater, InterpolationInstantiator, SupportingPoint};
+use super::{context::InterpolationCtx, Interpolater, InterpolationInner, SupportingPoint};
 
 #[derive(Debug)]
 pub struct LinearInterpolation {
@@ -11,7 +11,7 @@ pub struct LinearInterpolation {
     values: Box<[f32]>,
 }
 
-impl InterpolationInstantiator for LinearInterpolation {
+impl InterpolationInner for LinearInterpolation {
     fn new(supporting_points: impl IntoIterator<Item = super::SupportingPoint>) -> Self {
         let ctx = InterpolationCtx::new(supporting_points);
         let values = vec![0f32; ctx.total_amount_entries()].into_boxed_slice();

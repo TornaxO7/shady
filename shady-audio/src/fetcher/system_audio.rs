@@ -44,10 +44,6 @@ impl SampleBuffer {
 
         self.length = new_len;
     }
-
-    pub fn clear(&mut self) {
-        self.length = 0;
-    }
 }
 
 #[derive(thiserror::Error, Debug, Clone, Copy)]
@@ -177,11 +173,18 @@ impl Drop for SystemAudio {
 }
 
 impl Fetcher for SystemAudio {
-    fn fetch_samples(&mut self, buf: &mut Vec<f32>) {
+    fn fetch_samples(&mut self, buf: &mut [f32]) {
+        let buf_len = buf.len();
         let mut sample_buffer = self.sample_buffer.lock().unwrap();
-        buf.resize(sample_buffer.length, 0.);
-        buf.copy_from_slice(&sample_buffer.buffer[..sample_buffer.length]);
-        sample_buffer.clear();
+
+        let amount_samples = buf_len.min(sample_buffer.length);
+        let new_sample_buffer_len = sample_buffer.length - amount_samples;
+
+        buf.copy_within(..buf_len - amount_samples, amount_samples);
+        buf[..amount_samples]
+            .copy_from_slice(&sample_buffer.buffer[new_sample_buffer_len..sample_buffer.length]);
+
+        sample_buffer.length = new_sample_buffer_len;
     }
 
     fn sample_rate(&self) -> SampleRate {

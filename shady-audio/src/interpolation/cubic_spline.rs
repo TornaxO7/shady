@@ -1,6 +1,6 @@
 use nalgebra::{Cholesky, DMatrix, DVector, Dyn};
 
-use super::{context::InterpolationCtx, Interpolater, InterpolationInstantiator};
+use super::{context::InterpolationCtx, Interpolater, InterpolationInner};
 
 type Width = usize;
 
@@ -16,7 +16,7 @@ pub struct CubicSplineInterpolation {
     gradient_diffs: Box<[f32]>,
 }
 
-impl InterpolationInstantiator for CubicSplineInterpolation {
+impl InterpolationInner for CubicSplineInterpolation {
     fn new(supporting_points: impl IntoIterator<Item = super::SupportingPoint>) -> Self {
         let ctx = InterpolationCtx::new(supporting_points);
         let values = vec![0f32; ctx.total_amount_entries()].into_boxed_slice();

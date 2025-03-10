@@ -1,4 +1,4 @@
-use super::{context::InterpolationCtx, Interpolater, InterpolationInstantiator};
+use super::{context::InterpolationCtx, Interpolater, InterpolationInner};
 
 #[derive(Debug)]
 pub struct NothingInterpolation {
@@ -6,7 +6,7 @@ pub struct NothingInterpolation {
     values: Box<[f32]>,
 }
 
-impl InterpolationInstantiator for NothingInterpolation {
+impl InterpolationInner for NothingInterpolation {
     fn new(supporting_points: impl IntoIterator<Item = super::SupportingPoint>) -> Self {
         let ctx = InterpolationCtx::new(supporting_points);
 

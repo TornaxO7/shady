@@ -1,18 +1,16 @@
-use std::num::NonZeroUsize;
-
-use shady_audio::{fetcher::DummyFetcher, ShadyAudio};
+use shady_audio::{
+    bar_processor::{BarProcessor, Config},
+    fetcher::DummyFetcher,
+    interpolation::CubicSpline,
+    SampleProcessor,
+};
 
 fn main() {
-    let mut audio = ShadyAudio::new(
-        DummyFetcher::new(),
-        shady_audio::ShadyAudioConfig {
-            amount_bars: NonZeroUsize::new(5).unwrap(),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
+    sample_processor.process_next_samples();
 
-    for _ in 0..1000 {
-        audio.get_bars();
-    }
+    let mut bar_processor: BarProcessor<CubicSpline> =
+        BarProcessor::new(&sample_processor, Config::default());
+
+    bar_processor.process_bars(&sample_processor);
 }

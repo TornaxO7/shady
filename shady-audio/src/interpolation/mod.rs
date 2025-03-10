@@ -20,13 +20,14 @@ pub enum InterpolationVariant {
     None,
 
     /// Use the linear interpolation.
+    ///
     Linear,
 
     /// Use the cubic spline interpolation.
     CubicSpline,
 }
 
-pub trait Interpolater {
+pub(crate) trait Interpolater {
     fn interpolate(&mut self) -> &[f32];
 
     /// The length of the returned slice of `interpolate()`.
@@ -35,7 +36,7 @@ pub trait Interpolater {
     fn supporting_points_mut(&mut self) -> IterMut<'_, SupportingPoint>;
 }
 
-pub trait InterpolationInstantiator: Interpolater + Sized {
+pub(crate) trait InterpolationInner: Interpolater + Sized {
     fn new(supporting_points: impl IntoIterator<Item = SupportingPoint>) -> Self;
 
     fn boxed(supporting_points: impl IntoIterator<Item = SupportingPoint>) -> Box<Self> {
@@ -44,7 +45,7 @@ pub trait InterpolationInstantiator: Interpolater + Sized {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SupportingPoint {
+pub(crate) struct SupportingPoint {
     /// The x value of the supporting point
     pub x: usize,
 
