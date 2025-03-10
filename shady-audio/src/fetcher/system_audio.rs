@@ -140,13 +140,6 @@ impl SystemAudio {
     /// # Args
     /// - `error_callback` will be passed to the
     ///   `error_callback` of [`cpal::traits::DeviceTrait::build_input_stream`].
-    ///
-    /// # Example
-    /// ```no_run
-    /// use shady_audio::{ShadyAudio, ShadyAudioConfig, fetcher::SystemAudioFetcher};
-    ///
-    /// let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(), ShadyAudioConfig::default());
-    /// ```
     pub fn default<E>(error_callback: E) -> Result<Box<Self>, SystemAudioError>
     where
         E: FnMut(StreamError) + Send + 'static,
