@@ -3,13 +3,14 @@ mod config;
 use std::ops::Range;
 
 pub use config::Config;
+use config::InterpolationVariant;
 use realfft::num_complex::Complex32;
 use tracing::debug;
 
 use crate::{
     interpolation::{
-        CubicSplineInterpolation, Interpolater, InterpolationInner, InterpolationVariant,
-        LinearInterpolation, NothingInterpolation, SupportingPoint,
+        CubicSplineInterpolation, Interpolater, InterpolationInner, LinearInterpolation,
+        NothingInterpolation, SupportingPoint,
     },
     SampleProcessor, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
 };

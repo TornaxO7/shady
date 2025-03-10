@@ -3,7 +3,21 @@ use std::{
     ops::Range,
 };
 
-use crate::interpolation::InterpolationVariant;
+/// Decides which interpolation strategy should be used.
+#[derive(Debug, Clone, Copy, Hash)]
+pub enum InterpolationVariant {
+    /// No interpolation strategy should be used.
+    ///
+    /// Only the supporting bars which are calculated are going to be displayed.
+    None,
+
+    /// Use the linear interpolation.
+    ///
+    Linear,
+
+    /// Use the cubic spline interpolation.
+    CubicSpline,
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
