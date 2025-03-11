@@ -1,8 +1,6 @@
 use std::{fmt, time::Instant};
 
-use wgpu::Device;
-
-use crate::template::TemplateGenerator;
+use crate::{template::TemplateGenerator, ShadyDescriptor};
 
 use super::Resource;
 
@@ -14,8 +12,8 @@ pub struct Time {
 }
 
 impl Resource for Time {
-    fn new(device: &Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<f32>() as u64);
+    fn new(desc: &ShadyDescriptor) -> Self {
+        let buffer = Self::create_uniform_buffer(desc.device, std::mem::size_of::<f32>() as u64);
 
         Self {
             time: Instant::now(),

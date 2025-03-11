@@ -75,11 +75,11 @@ pub struct Shady {
 // General functions
 impl Shady {
     /// Create a new instance of `Shady`.
-    #[instrument(level = "trace")]
+    #[instrument(level = "trace", skip_all)]
     pub fn new<'a>(desc: ShadyDescriptor) -> Self {
-        let ShadyDescriptor { device } = desc;
+        let ShadyDescriptor { device, .. } = &desc;
 
-        let resources = Resources::new(device);
+        let resources = Resources::new(&desc);
 
         let bind_group = resources.bind_group(device);
 
@@ -187,9 +187,12 @@ impl Shady {
     #[cfg(feature = "audio")]
     pub fn set_audio_frequency_range(
         &mut self,
-        freq_range: std::ops::Range<std::num::NonZeroU32>,
-    ) -> Result<(), shady_audio::Error> {
-        self.resources.audio.set_frequency_range(freq_range)
+        sample_processor: &shady_audio::SampleProcessor,
+        freq_range: std::ops::Range<std::num::NonZeroU16>,
+    ) {
+        self.resources
+            .audio
+            .set_frequency_range(sample_processor, freq_range);
     }
 
     /// Sets the amount of bar-values.
@@ -198,20 +201,17 @@ impl Shady {
     /// `iAudio`
     #[inline]
     #[cfg(feature = "audio")]
-    pub fn set_audio_bars(&mut self, device: &Device, amount_bars: std::num::NonZeroUsize) {
-        self.resources.audio.set_bars(device, amount_bars);
+    pub fn set_audio_bars(
+        &mut self,
+        device: &Device,
+        sample_processor: &shady_audio::SampleProcessor,
+        amount_bars: std::num::NonZeroUsize,
+    ) {
+        self.resources
+            .audio
+            .set_bars(device, sample_processor, amount_bars);
         // audio buffer will change => needs to be rebinded
         self.bind_group = self.resources.bind_group(device);
-    }
-
-    /// Set the audio fetcher which [Shady] should use.
-    ///
-    /// # Affected uniform buffer
-    /// `iAudio`
-    #[inline]
-    #[cfg(feature = "audio")]
-    pub fn set_audio_fetcher(&mut self, fetcher: Box<dyn shady_audio::fetcher::Fetcher>) {
-        self.resources.audio.set_fetcher(fetcher);
     }
 }
 
@@ -220,8 +220,12 @@ impl Shady {
     /// Updates the `iAudio` uniform buffer with new values.
     #[inline]
     #[cfg(feature = "audio")]
-    pub fn update_audio_buffer(&mut self, queue: &wgpu::Queue) {
-        self.resources.audio.fetch_audio();
+    pub fn update_audio_buffer(
+        &mut self,
+        queue: &wgpu::Queue,
+        sample_processor: &shady_audio::SampleProcessor,
+    ) {
+        self.resources.audio.fetch_audio(sample_processor);
         self.resources.audio.update_buffer(queue);
     }
 

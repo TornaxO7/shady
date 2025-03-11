@@ -2,7 +2,7 @@ use std::fmt;
 
 use tracing::instrument;
 
-use crate::template::TemplateGenerator;
+use crate::{template::TemplateGenerator, ShadyDescriptor};
 
 use super::Resource;
 
@@ -60,8 +60,9 @@ impl Mouse {
 }
 
 impl Resource for Mouse {
-    fn new(device: &wgpu::Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<[f32; 4]>() as u64);
+    fn new(desc: &ShadyDescriptor) -> Self {
+        let buffer =
+            Self::create_uniform_buffer(desc.device, std::mem::size_of::<[f32; 4]>() as u64);
 
         Self {
             pos: Coord::default(),
