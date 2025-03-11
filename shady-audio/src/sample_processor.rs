@@ -3,6 +3,7 @@ use realfft::{num_complex::Complex32, RealFftPlanner};
 
 use crate::fetcher::Fetcher;
 
+/// Prepares the samples of the fetcher for the [crate::BarProcessor].
 pub struct SampleProcessor {
     planner: RealFftPlanner<f32>,
     hann_window: Box<[f32]>,
@@ -17,6 +18,7 @@ pub struct SampleProcessor {
 }
 
 impl SampleProcessor {
+    /// Creates a new instance with the given fetcher where the audio samples are fetched from.
     pub fn new(fetcher: Box<dyn Fetcher>) -> Self {
         let fft_size = {
             let sample_rate = fetcher.sample_rate().0;
@@ -63,6 +65,8 @@ impl SampleProcessor {
         }
     }
 
+    /// Tell the processor to take some samples of the fetcher and prepare them
+    /// for the [crate::BarProcessor]s.
     pub fn process_next_samples(&mut self) {
         self.fetcher.fetch_samples(&mut self.fft_in_raw);
 

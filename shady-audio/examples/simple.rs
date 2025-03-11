@@ -1,8 +1,4 @@
-use shady_audio::{
-    bar_processor::{BarProcessor, Config},
-    fetcher::DummyFetcher,
-    SampleProcessor,
-};
+use shady_audio::{fetcher::DummyFetcher, BarProcessor, Config, SampleProcessor};
 
 fn main() {
     let mut sample_processor = SampleProcessor::new(DummyFetcher::new());

@@ -46,14 +46,19 @@ impl SampleBuffer {
     }
 }
 
+/// Errors which can occur while creating [crate::fetcher::SystemAudioFetcher].
 #[derive(thiserror::Error, Debug, Clone, Copy)]
 pub enum SystemAudioError {
+    /// No default audio device could be found to fetch from.
     #[error("Couldn't retrieve default output dev")]
     NoDefaultDevice,
 
+    /// [crate::fetcher::SystemAudioFetcher] requires the sample format to be `F32` but something
+    /// else was given from the audio source.
     #[error("Expected sample format F32 but got {0} instead.")]
     InvalidSampleFormat(SampleFormat),
 
+    /// No default configuration could be found of the default output device.
     #[error("Couldn't retrieve default config of the output stream of the default device.")]
     NoDefaultOutputStreamConfig,
 }

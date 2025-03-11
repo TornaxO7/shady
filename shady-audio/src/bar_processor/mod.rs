@@ -32,6 +32,7 @@ impl SupportingPointInfo {
     }
 }
 
+/// The struct which computates the bar values of the samples of the fetcher.
 pub struct BarProcessor {
     sensitivity: f32,
 
@@ -42,6 +43,9 @@ pub struct BarProcessor {
 }
 
 impl BarProcessor {
+    /// Creates a new instance.
+    ///
+    /// See the examples of this crate to see it's usage.
     pub fn new(processor: &SampleProcessor, config: Config) -> Self {
         let Config {
             interpolation,
@@ -111,6 +115,7 @@ impl BarProcessor {
         }
     }
 
+    /// Returns the values for each bar.
     pub fn process_bars(&mut self, processor: &SampleProcessor) -> &[f32] {
         let (overshoot, is_silent) = self.update_supporting_points(processor.fft_out());
         if overshoot {
@@ -180,6 +185,7 @@ impl BarProcessor {
         (overshoot, is_silent)
     }
 
+    /// Returns its config.
     pub fn config(&self) -> &Config {
         &self.config
     }
