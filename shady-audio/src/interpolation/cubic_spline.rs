@@ -21,29 +21,28 @@ impl InterpolationInner for CubicSplineInterpolation {
         let ctx = InterpolationCtx::new(supporting_points);
         let values = vec![0f32; ctx.total_amount_entries()].into_boxed_slice();
 
-        if ctx.supporting_points.len() < 3 {
-            panic!(concat![
-                "I'm sorry to say this but currently it's required to have at least 3 supporting points for the cubic interpolation.\n",
-                "Please raise an issue so I can prioritize this issue"
-            ]);
-        }
-
-        let section_widths = {
-            let mut section_width = Vec::with_capacity(ctx.supporting_points.len() - 1);
+        let section_widths = if ctx.supporting_points.len() >= 2 {
+            let mut section_widths = Vec::with_capacity(ctx.supporting_points.len() - 1);
 
             for (i, right) in ctx.supporting_points[1..].iter().enumerate() {
                 let left = &ctx.supporting_points[i];
 
                 let width = right.x - left.x;
-                section_width.push(width);
+                section_widths.push(width);
             }
 
-            section_width.into_boxed_slice()
+            section_widths.into_boxed_slice()
+        } else {
+            Box::new([])
         };
 
         let amount_sections = section_widths.len();
 
-        let matrix = get_matrix(&section_widths);
+        let matrix = {
+            let matrix = get_matrix(&section_widths);
+
+            ((1. / 6.) * matrix.clone()).cholesky().unwrap_or_else(|| panic!("Hold up! Looks like my numeric knowledge isn't really numericing ;-----;\nThe matrix which got calculated is: {}", matrix))
+        };
         let gradients = vec![0f32; amount_sections].into_boxed_slice();
         let gradient_diffs = vec![0f32; amount_sections].into_boxed_slice();
 
@@ -64,23 +63,39 @@ impl Interpolater for CubicSplineInterpolation {
             self.values[point.x] = point.y;
         }
 
+        if self.ctx.supporting_points.len() < 2 {
+            return &self.values;
+        }
+
         // == preparation ==
+        debug_assert!(
+            self.ctx.supporting_points.len() >= 2,
+            "Starting from here, it's expected that we have at least 2 supporting points"
+        );
+
         // update gradients
-        for (i, next) in self.ctx.supporting_points[1..].iter().enumerate() {
-            let prev = &self.ctx.supporting_points[i];
-            self.gradients[i] = (prev.y - next.y) / (prev.x as f32 - next.x as f32);
+        {
+            let prev_iter = self.ctx.supporting_points.iter();
+            let next_iter = prev_iter.clone().skip(1);
+            let gradient_iter = self.gradients.iter_mut();
+
+            for ((gradient, prev), next) in gradient_iter.zip(prev_iter).zip(next_iter) {
+                *gradient = (prev.y - next.y) / (prev.x as f32 - next.x as f32);
+            }
         }
 
         // update gradient diffs
         {
             self.gradient_diffs[0] = self.gradients[0];
 
-            for (prev_idx, &next) in self.gradients[1..(self.gradients.len() - 1)]
-                .iter()
-                .enumerate()
             {
-                let prev = self.gradients[prev_idx];
-                self.gradient_diffs[prev_idx + 1] = next - prev;
+                let diff_iter = self.gradient_diffs.iter_mut().skip(1);
+                let prev_iter = self.gradients.iter();
+                let next_iter = prev_iter.clone().skip(1);
+
+                for ((diff, prev), next) in diff_iter.zip(prev_iter).zip(next_iter) {
+                    *diff = next - prev;
+                }
             }
 
             *self.gradient_diffs.last_mut().unwrap() = -self.gradients.last().unwrap();
@@ -99,7 +114,8 @@ impl Interpolater for CubicSplineInterpolation {
             let right = &self.ctx.supporting_points[n];
 
             let prev_gamma = gammas[n - 1];
-            let next_gamma = gammas[n];
+            // `None` appears, if we are in the last section.
+            let next_gamma = gammas.get(n).cloned().unwrap_or(0.);
 
             let gradient = self.gradients[n - 1];
             let section_width = self.section_widths[n - 1];
@@ -131,40 +147,34 @@ impl Interpolater for CubicSplineInterpolation {
     }
 }
 
-fn get_matrix(section_widths: &[usize]) -> Cholesky<f32, Dyn> {
-    let amount_widths = section_widths.len();
+fn get_matrix(section_widths: &[usize]) -> DMatrix<f32> {
+    let dimension = section_widths.len();
 
-    let mut matrix = DMatrix::zeros(amount_widths, amount_widths);
+    let mut matrix = DMatrix::zeros(dimension, dimension);
 
-    // add first row
-    {
-        let mut first_row = matrix.row_mut(0);
-        first_row[0] = 2. * section_widths[0] as f32;
-        first_row[1] = section_widths[0] as f32;
-    }
+    for n in 0..dimension {
+        let mut row = matrix.row_mut(n);
+        let prev_width = section_widths[n.saturating_sub(1)] as f32;
+        let curr_width = section_widths[n] as f32;
 
-    // add rows in between
-    {
-        for (offset, row_idx) in (1..(amount_widths - 1)).enumerate() {
-            let mut row = matrix.row_mut(row_idx);
+        let is_in_first_row = n == 0;
+        let is_in_last_row = n + 1 == dimension;
 
-            row[offset] = section_widths[offset] as f32;
-            row[offset + 1] = 2. * (section_widths[offset] + section_widths[offset + 1]) as f32;
-            row[offset + 2] = section_widths[offset + 1] as f32;
+        if !is_in_first_row {
+            row[n - 1] = prev_width;
+        }
+
+        if is_in_first_row || is_in_last_row {
+            row[n] = 2. * curr_width;
+        } else {
+            row[n] = 2. * (prev_width + curr_width);
+        }
+
+        if !is_in_last_row {
+            row[n + 1] = curr_width;
         }
     }
-
-    // add last row
-    {
-        let mut last_row = matrix.row_mut(amount_widths - 1);
-
-        last_row[amount_widths - 2] = section_widths[amount_widths - 1] as f32;
-        last_row[amount_widths - 1] = 2. * section_widths[amount_widths - 1] as f32;
-    }
-
-    ((1. / 6.) * matrix.clone())
-        .cholesky()
-        .unwrap_or_else( || panic!("Hold up! Looks like my numeric knowledge isn't really numericing ;-----;\nThe matrix which got calculated is: {}", matrix))
+    matrix
 }
 
 #[cfg(test)]
@@ -173,52 +183,156 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn equidistant_supporting_points() {
-        const AMOUNT_POINTS: usize = 10;
-        const AMOUNT_SECTIONS: usize = AMOUNT_POINTS - 1;
+    fn validate_interpolation(interpolation: &[f32]) {
+        // just check that the interpolation didn't panic (any unwraps)
+        for value in interpolation.iter() {
+            assert!(0. <= *value, "{:?}", interpolation);
+        }
+    }
 
+    #[test]
+    fn no_supporting_points() {
+        let mut interpolator = CubicSplineInterpolation::new([]);
+        assert_eq!(interpolator.interpolate(), &[]);
+    }
+
+    #[test]
+    fn one_supporting_point() {
+        let supporting_points = [SupportingPoint { x: 0, y: 1.0 }];
+
+        let mut interpolator = CubicSplineInterpolation::new(supporting_points);
+        assert_eq!(interpolator.interpolate(), &[1.]);
+    }
+
+    #[test]
+    fn two_supporting_points() {
         let supporting_points = [
-            SupportingPoint { x: 0, y: 0.0 },
-            SupportingPoint { x: 1, y: 0.0 },
-            SupportingPoint { x: 2, y: 0.0 },
-            SupportingPoint { x: 3, y: 0.0 },
-            SupportingPoint { x: 4, y: 0.0 },
-            SupportingPoint { x: 5, y: 0.0 },
-            SupportingPoint { x: 6, y: 0.0 },
-            SupportingPoint { x: 7, y: 0.0 },
-            SupportingPoint { x: 8, y: 0.0 },
-            SupportingPoint { x: 9, y: 0.0 },
+            SupportingPoint { x: 0, y: 0. },
+            SupportingPoint { x: 5, y: 1.0 },
         ];
 
-        let interpolator = CubicSplineInterpolation::new(supporting_points);
+        let mut interpolator = CubicSplineInterpolation::new(supporting_points);
+        validate_interpolation(interpolator.interpolate());
+    }
 
-        assert_eq!(interpolator.section_widths.as_ref(), &[1; AMOUNT_SECTIONS]);
+    #[test]
+    fn three_supporting_points() {
+        let supporting_points = [
+            SupportingPoint { x: 0, y: 0. },
+            SupportingPoint { x: 5, y: 0.25 },
+            SupportingPoint { x: 10, y: 1. },
+        ];
 
-        // check matrix
-        {
+        let mut interpolator = CubicSplineInterpolation::new(supporting_points);
+        validate_interpolation(interpolator.interpolate());
+    }
+
+    #[test]
+    fn multiple_supporting_points() {
+        let supporting_points = [
+            SupportingPoint { x: 0, y: 0. },
+            SupportingPoint { x: 5, y: 0.25 },
+            SupportingPoint { x: 10, y: 0.3 },
+            SupportingPoint { x: 15, y: 0.6 },
+            SupportingPoint { x: 20, y: 1. },
+        ];
+
+        let mut interpolator = CubicSplineInterpolation::new(supporting_points);
+        validate_interpolation(interpolator.interpolate());
+    }
+
+    mod matrix {
+        use super::*;
+
+        #[test]
+        fn no_sections() {
+            let matrix = get_matrix(&[]);
+            let expected_matrix = DMatrix::from_row_slice(0, 0, &[]);
+
+            assert_eq!(
+                matrix, expected_matrix,
+                "\nLeft:\n{}\nRight:\n{}",
+                matrix, expected_matrix
+            );
+        }
+
+        #[test]
+        fn one_section() {
+            const DIMENSION: usize = 1;
+            let matrix = get_matrix(&[1]);
+            let expected_matrix = DMatrix::from_row_slice(DIMENSION, DIMENSION, &[2.]);
+
+            assert_eq!(
+                matrix, expected_matrix,
+                "\nLeft:\n{}\nRight:\n{}",
+                matrix, expected_matrix
+            );
+        }
+
+        #[test]
+        fn two_sections() {
+            const DIMENSION: usize = 2;
+            let matrix = get_matrix(&[1; DIMENSION]);
             #[rustfmt::skip]
-            let expected_matrix = {
-                let mut matrix = DMatrix::from_row_slice(
-                AMOUNT_SECTIONS,
-                AMOUNT_SECTIONS,
+            let expected_matrix = DMatrix::from_row_slice(DIMENSION, DIMENSION,
                 &[
-                            2., 1., 0., 0., 0., 0., 0., 0., 0.,
-                            1., 4., 1., 0., 0., 0., 0., 0., 0.,
-                            0., 1., 4., 1., 0., 0., 0., 0., 0.,
-                            0., 0., 1., 4., 1., 0., 0., 0., 0.,
-                            0., 0., 0., 1., 4., 1., 0., 0., 0.,
-                            0., 0., 0., 0., 1., 4., 1., 0., 0.,
-                            0., 0., 0., 0., 0., 1., 4., 1., 0.,
-                            0., 0., 0., 0., 0., 0., 1., 4., 1.,
-                            0., 0., 0., 0., 0., 0., 0., 1., 2.,
-                        ]);
+                    2., 1.,
+                    1., 2.
+                ]
+            );
 
-                matrix *= 1. / 6.;
-                matrix.cholesky().unwrap()
-            };
+            assert_eq!(
+                matrix, expected_matrix,
+                "\nLeft:\n{}\nRight:\n{}",
+                matrix, expected_matrix
+            );
+        }
 
-            assert_eq!(interpolator.matrix.l(), expected_matrix.l());
+        #[test]
+        fn three_sections() {
+            const DIMENSION: usize = 3;
+            let matrix = get_matrix(&[1; DIMENSION]);
+            #[rustfmt::skip]
+            let expected_matrix = DMatrix::from_row_slice(DIMENSION, DIMENSION,
+                &[
+                    2., 1., 0.,
+                    1., 4., 1.,
+                    0., 1., 2.,
+                ]
+            );
+
+            assert_eq!(
+                matrix, expected_matrix,
+                "\nLeft:\n{}\nRight:\n{}",
+                matrix, expected_matrix
+            );
+        }
+
+        #[test]
+        fn ten_sections() {
+            const DIMENSION: usize = 10;
+            let matrix = get_matrix(&[1; DIMENSION]);
+            #[rustfmt::skip]
+            let expected_matrix = DMatrix::from_row_slice(DIMENSION, DIMENSION,
+                &[
+                    2., 1., 0., 0., 0., 0., 0., 0., 0., 0.,
+                    1., 4., 1., 0., 0., 0., 0., 0., 0., 0.,
+                    0., 1., 4., 1., 0., 0., 0., 0., 0., 0.,
+                    0., 0., 1., 4., 1., 0., 0., 0., 0., 0.,
+                    0., 0., 0., 1., 4., 1., 0., 0., 0., 0.,
+                    0., 0., 0., 0., 1., 4., 1., 0., 0., 0.,
+                    0., 0., 0., 0., 0., 1., 4., 1., 0., 0.,
+                    0., 0., 0., 0., 0., 0., 1., 4., 1., 0.,
+                    0., 0., 0., 0., 0., 0., 0., 1., 4., 1.,
+                    0., 0., 0., 0., 0., 0., 0., 0., 1., 2.,
+                ]
+            );
+
+            assert_eq!(
+                matrix, expected_matrix,
+                "\nLeft:\n{}\nRight:\n{}",
+                matrix, expected_matrix
+            );
         }
     }
 }
