@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use pollster::FutureExt;
-use shady::{Shady, ShadyDescriptor};
+use shady::{
+    shady_audio::{fetcher::SystemAudioFetcher, SampleProcessor},
+    Shady, ShadyDescriptor,
+};
 use tracing::instrument;
 use wgpu::{
     Backends, Device, Instance, Queue, ShaderSource, Surface, SurfaceConfiguration,
@@ -19,6 +22,7 @@ pub struct WindowState<'a> {
     pipeline: Option<shady::ShadyRenderPipeline>,
     window: Arc<Window>,
     pub shady: Shady,
+    sample_processor: SampleProcessor,
 }
 
 impl<'a> WindowState<'a> {
@@ -47,7 +51,7 @@ impl<'a> WindowState<'a> {
             .block_on()
             .expect("Retrieve device and queue");
 
-        let (config, shady, pipeline) = {
+        let (config, shady, pipeline, sample_processor) = {
             let surface_caps = surface.get_capabilities(&adapter);
             let surface_format = surface_caps
                 .formats
@@ -72,9 +76,14 @@ impl<'a> WindowState<'a> {
             let pipeline = shader_source
                 .map(|source| shady::create_render_pipeline(&device, source, &surface_format));
 
-            let shady = Shady::new(ShadyDescriptor { device: &device });
+            let sample_processor =
+                SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+            let shady = Shady::new(ShadyDescriptor {
+                device: &device,
+                sample_processor: &sample_processor,
+            });
 
-            (config, shady, pipeline)
+            (config, shady, pipeline, sample_processor)
         };
 
         surface.configure(&device, &config);
@@ -85,6 +94,7 @@ impl<'a> WindowState<'a> {
             queue,
             config,
             window,
+            sample_processor,
             shady,
             pipeline,
         }
@@ -111,7 +121,11 @@ impl<'a> RenderState<'a> for WindowState<'a> {
         self.shady.inc_frame();
 
         #[cfg(feature = "audio")]
-        self.shady.update_audio_buffer(&self.queue);
+        {
+            self.sample_processor.process_next_samples();
+            self.shady
+                .update_audio_buffer(&self.queue, &self.sample_processor);
+        }
         #[cfg(feature = "frame")]
         self.shady.update_frame_buffer(&self.queue);
         #[cfg(feature = "mouse")]
