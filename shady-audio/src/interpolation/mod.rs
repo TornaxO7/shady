@@ -14,9 +14,6 @@ pub use nothing::NothingInterpolation;
 pub trait Interpolater {
     fn interpolate(&mut self) -> &[f32];
 
-    /// The length of the returned slice of `interpolate()`.
-    fn total_amount_entries(&self) -> usize;
-
     fn supporting_points_mut(&mut self) -> IterMut<'_, SupportingPoint>;
 }
 

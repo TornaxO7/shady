@@ -6,6 +6,7 @@ use super::{InterpolationSection, SupportingPoint};
 pub struct InterpolationCtx {
     pub supporting_points: Box<[SupportingPoint]>,
     pub sections: Box<[InterpolationSection]>,
+    pub bar_values: Box<[f32]>,
 }
 
 /// Constructing stuff
@@ -37,22 +38,24 @@ impl InterpolationCtx {
             sections.into_boxed_slice()
         };
 
+        let bar_values = {
+            let amount_bars = supporting_points
+                .last()
+                .map(|point| point.x + 1)
+                .unwrap_or(0);
+
+            vec![0f32; amount_bars].into_boxed_slice()
+        };
+
         let ctx = Self {
             supporting_points,
             sections,
+            bar_values,
         };
 
         debug!("{:?}", ctx);
 
         ctx
-    }
-
-    pub fn total_amount_entries(&self) -> usize {
-        if let Some(last) = self.supporting_points.last() {
-            last.x + 1
-        } else {
-            0
-        }
     }
 }
 

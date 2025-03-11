@@ -6,7 +6,6 @@ type Width = usize;
 
 #[derive(Debug, Clone)]
 pub struct CubicSplineInterpolation {
-    values: Box<[f32]>,
     ctx: InterpolationCtx,
 
     section_widths: Box<[Width]>,
@@ -19,7 +18,6 @@ pub struct CubicSplineInterpolation {
 impl InterpolationInner for CubicSplineInterpolation {
     fn new(supporting_points: impl IntoIterator<Item = super::SupportingPoint>) -> Self {
         let ctx = InterpolationCtx::new(supporting_points);
-        let values = vec![0f32; ctx.total_amount_entries()].into_boxed_slice();
 
         let section_widths = if ctx.supporting_points.len() >= 2 {
             let mut section_widths = Vec::with_capacity(ctx.supporting_points.len() - 1);
@@ -47,7 +45,6 @@ impl InterpolationInner for CubicSplineInterpolation {
         let gradient_diffs = vec![0f32; amount_sections].into_boxed_slice();
 
         Self {
-            values,
             ctx,
             section_widths,
             matrix,
@@ -60,11 +57,11 @@ impl InterpolationInner for CubicSplineInterpolation {
 impl Interpolater for CubicSplineInterpolation {
     fn interpolate(&mut self) -> &[f32] {
         for point in self.ctx.supporting_points.iter() {
-            self.values[point.x] = point.y;
+            self.ctx.bar_values[point.x] = point.y;
         }
 
         if self.ctx.supporting_points.len() < 2 {
-            return &self.values;
+            return &self.ctx.bar_values;
         }
 
         // == preparation ==
@@ -131,15 +128,11 @@ impl Interpolater for CubicSplineInterpolation {
                         * ((prev_gamma + 2. * next_gamma) * (x - left.x as f32)
                             - (2. * prev_gamma + next_gamma) * (x - right.x as f32));
 
-                self.values[bar_idx] = interpolated_value;
+                self.ctx.bar_values[bar_idx] = interpolated_value;
             }
         }
 
-        &self.values
-    }
-
-    fn total_amount_entries(&self) -> usize {
-        self.ctx.total_amount_entries()
+        &self.ctx.bar_values
     }
 
     fn supporting_points_mut(&mut self) -> std::slice::IterMut<'_, super::SupportingPoint> {

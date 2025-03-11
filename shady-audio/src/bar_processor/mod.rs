@@ -38,6 +38,7 @@ pub struct BarProcessor {
 
     supporting_point_infos: Box<[SupportingPointInfo]>,
     interpolator: Box<dyn Interpolater>,
+    amount_bars: usize,
 }
 
 impl BarProcessor {
@@ -106,6 +107,7 @@ impl BarProcessor {
             sensitivity: 1.,
             supporting_point_infos,
             interpolator,
+            amount_bars: usize::from(amount_bars),
         }
     }
 
@@ -123,8 +125,6 @@ impl BarProcessor {
     fn update_supporting_points(&mut self, fft_out: &[Complex32]) -> (bool, bool) {
         let mut overshoot = false;
         let mut is_silent = true;
-
-        let amount_bars = self.interpolator.total_amount_entries();
 
         for (supporting_point, info) in self
             .interpolator
@@ -146,7 +146,9 @@ impl BarProcessor {
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap();
 
-                self.sensitivity * raw_bar_val * 10f32.powf((x as f32 / amount_bars as f32) - 1.1)
+                self.sensitivity
+                    * raw_bar_val
+                    * 10f32.powf((x as f32 / self.amount_bars as f32) - 1.1)
             };
 
             debug_assert!(!prev_magnitude.is_nan());
