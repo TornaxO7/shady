@@ -2,8 +2,7 @@ mod config;
 
 use std::ops::Range;
 
-pub use config::Config;
-use config::InterpolationVariant;
+pub use config::{Config, InterpolationVariant};
 use realfft::num_complex::Complex32;
 use tracing::debug;
 
@@ -38,7 +37,8 @@ pub struct BarProcessor {
 
     supporting_point_infos: Box<[SupportingPointInfo]>,
     interpolator: Box<dyn Interpolater>,
-    amount_bars: usize,
+
+    config: Config,
 }
 
 impl BarProcessor {
@@ -47,7 +47,7 @@ impl BarProcessor {
             interpolation,
             amount_bars,
             freq_range,
-        } = config;
+        } = config.clone();
 
         let (supporting_points, supporting_point_infos) = {
             let sample_rate = processor.sample_rate();
@@ -107,7 +107,7 @@ impl BarProcessor {
             sensitivity: 1.,
             supporting_point_infos,
             interpolator,
-            amount_bars: usize::from(amount_bars),
+            config,
         }
     }
 
@@ -148,7 +148,7 @@ impl BarProcessor {
 
                 self.sensitivity
                     * raw_bar_val
-                    * 10f32.powf((x as f32 / self.amount_bars as f32) - 1.1)
+                    * 10f32.powf((x as f32 / usize::from(self.config.amount_bars) as f32) - 1.1)
             };
 
             debug_assert!(!prev_magnitude.is_nan());
@@ -178,6 +178,10 @@ impl BarProcessor {
         }
 
         (overshoot, is_silent)
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 }
 
