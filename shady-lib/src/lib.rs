@@ -92,7 +92,7 @@ impl Shady {
     }
 
     /// Add a render pass to the given `encoder` and `texture_view`.
-    pub fn add_render_pass<'a>(
+    pub fn add_render_pass(
         &self,
         encoder: &mut CommandEncoder,
         texture_view: &TextureView,
