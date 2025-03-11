@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::template::TemplateGenerator;
+use crate::{template::TemplateGenerator, ShadyDescriptor};
 
 use super::Resource;
 
@@ -17,8 +17,8 @@ impl Frame {
 }
 
 impl Resource for Frame {
-    fn new(device: &wgpu::Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<u32>() as u64);
+    fn new(desc: &ShadyDescriptor) -> Self {
+        let buffer = Self::create_uniform_buffer(desc.device, std::mem::size_of::<u32>() as u64);
 
         Self { value: 0, buffer }
     }

@@ -1,16 +1,13 @@
 use std::{
     fmt,
-    num::{NonZeroU32, NonZeroUsize},
+    num::{NonZeroU16, NonZeroUsize},
     ops::Range,
 };
 
-use shady_audio::{
-    fetcher::{Fetcher, SystemAudioFetcher},
-    ShadyAudio, ShadyAudioConfig,
-};
+use shady_audio::{BarProcessor, Config, SampleProcessor};
 use wgpu::Device;
 
-use crate::template::TemplateGenerator;
+use crate::{template::TemplateGenerator, ShadyDescriptor};
 
 use super::Resource;
 
@@ -20,7 +17,7 @@ const DESCRIPTION: &str = "\
 // So for example, if you are interested in the bass, choose the lower indices.";
 
 pub struct Audio {
-    shady_audio: ShadyAudio,
+    bar_processor: BarProcessor,
 
     bar_values: Box<[f32]>,
 
@@ -28,14 +25,25 @@ pub struct Audio {
 }
 
 impl Audio {
-    pub fn fetch_audio(&mut self) {
-        let bars = self.shady_audio.get_bars();
-
+    pub fn fetch_audio(&mut self, sample_processor: &SampleProcessor) {
+        let bars = self.bar_processor.process_bars(sample_processor);
         self.bar_values.copy_from_slice(bars);
     }
 
-    pub fn set_bars(&mut self, device: &Device, amount_bars: NonZeroUsize) {
-        self.shady_audio.set_bars(amount_bars);
+    pub fn set_bars(
+        &mut self,
+        device: &Device,
+        sample_processor: &SampleProcessor,
+        amount_bars: NonZeroUsize,
+    ) {
+        self.bar_processor = BarProcessor::new(
+            sample_processor,
+            Config {
+                amount_bars,
+                ..self.bar_processor.config().clone()
+            },
+        );
+
         self.bar_values = vec![0.; usize::from(amount_bars)].into_boxed_slice();
 
         self.buffer = Self::create_storage_buffer(
@@ -46,36 +54,32 @@ impl Audio {
 
     pub fn set_frequency_range(
         &mut self,
-        freq_range: Range<NonZeroU32>,
-    ) -> Result<(), shady_audio::Error> {
-        self.shady_audio.set_freq_range(freq_range)
-    }
-
-    pub fn set_fetcher(&mut self, fetcher: Box<dyn Fetcher>) {
-        self.shady_audio.set_fetcher(fetcher);
+        sample_processor: &SampleProcessor,
+        freq_range: Range<NonZeroU16>,
+    ) {
+        self.bar_processor = BarProcessor::new(
+            sample_processor,
+            Config {
+                freq_range,
+                ..self.bar_processor.config().clone()
+            },
+        );
     }
 }
 
 impl Resource for Audio {
-    fn new(device: &Device) -> Self {
+    fn new(desc: &ShadyDescriptor) -> Self {
         let buffer = Self::create_storage_buffer(
-            device,
+            desc.device,
             std::mem::size_of::<[f32; DEFAULT_AMOUNT_BARS]>() as u64,
         );
 
-        let shady_audio = ShadyAudio::new(
-            SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
-            ShadyAudioConfig {
-                amount_bars: NonZeroUsize::new(DEFAULT_AMOUNT_BARS).unwrap(),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let bar_processor = BarProcessor::new(desc.sample_processor, Config::default());
 
         let audio_buffer = Box::new([0.; DEFAULT_AMOUNT_BARS]);
 
         Self {
-            shady_audio,
+            bar_processor,
             bar_values: audio_buffer,
             buffer,
         }

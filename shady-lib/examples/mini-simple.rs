@@ -3,6 +3,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use pollster::FutureExt;
 use shady::{Shady, ShadyDescriptor, ShadyRenderPipeline};
+use shady_audio::{fetcher::SystemAudioFetcher, SampleProcessor};
 use wgpu::{
     Backends, Device, Instance, Queue, ShaderSource, Surface, SurfaceConfiguration,
     TextureViewDescriptor,
@@ -21,6 +22,9 @@ struct State<'a> {
     queue: Queue,
     config: SurfaceConfiguration,
     window: Arc<Window>,
+
+    // SHADY
+    sample_processor: SampleProcessor,
     // SHADY
     shady: Shady,
     // SHADY
@@ -90,7 +94,13 @@ impl<'a> State<'a> {
         };
 
         // SHADY
-        let shady = Shady::new(ShadyDescriptor { device: &device });
+        let sample_processor =
+            SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+        // SHADY
+        let shady = Shady::new(ShadyDescriptor {
+            device: &device,
+            sample_processor: &sample_processor,
+        });
 
         Self {
             surface,
@@ -98,6 +108,7 @@ impl<'a> State<'a> {
             queue,
             config,
             window,
+            sample_processor,
             shady,
             pipeline,
         }
@@ -110,7 +121,9 @@ impl<'a> State<'a> {
         {
             self.shady.inc_frame();
 
-            self.shady.update_audio_buffer(&mut self.queue);
+            self.sample_processor.process_next_samples();
+            self.shady
+                .update_audio_buffer(&mut self.queue, &self.sample_processor);
             self.shady.update_frame_buffer(&mut self.queue);
             self.shady.update_mouse_buffer(&mut self.queue);
             self.shady.update_resolution_buffer(&mut self.queue);

@@ -1,19 +1,18 @@
-use core::f32;
+mod config;
+
 use std::ops::Range;
 
-use cpal::SampleRate;
+pub use config::{Config, InterpolationVariant};
 use realfft::num_complex::Complex32;
-use tracing::{debug, instrument};
+use tracing::debug;
 
 use crate::{
     interpolation::{
-        CubicSplineInterpolation, Interpolater, InterpolationInstantiator, InterpolationVariant,
-        LinearInterpolation, NothingInterpolation, SupportingPoint,
+        CubicSplineInterpolation, Interpolater, InterpolationInner, LinearInterpolation,
+        NothingInterpolation, SupportingPoint,
     },
-    Hz, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
+    SampleProcessor, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
 };
-
-const DEFAULT_INIT_SENSITIVITY: f32 = 1.;
 
 /// Additional information about the supporting points
 #[derive(Debug)]
@@ -33,33 +32,37 @@ impl SupportingPointInfo {
     }
 }
 
-pub struct Equalizer {
+/// The struct which computates the bar values of the samples of the fetcher.
+pub struct BarProcessor {
     sensitivity: f32,
 
     supporting_point_infos: Box<[SupportingPointInfo]>,
     interpolator: Box<dyn Interpolater>,
-    interpolation: InterpolationVariant,
+
+    config: Config,
 }
 
-impl Equalizer {
-    #[instrument(name = "Equalizer::new")]
-    pub fn new(
-        amount_bars: usize,
-        freq_range: Range<Hz>,
-        sample_len: usize, // = fft size
-        sample_rate: SampleRate,
-        init_sensitivity: Option<f32>,
-        interpolation: InterpolationVariant,
-    ) -> Self {
-        assert!(sample_rate.0 > 0);
+impl BarProcessor {
+    /// Creates a new instance.
+    ///
+    /// See the examples of this crate to see it's usage.
+    pub fn new(processor: &SampleProcessor, config: Config) -> Self {
+        let Config {
+            interpolation,
+            amount_bars,
+            freq_range,
+        } = config.clone();
 
         let (supporting_points, supporting_point_infos) = {
+            let sample_rate = processor.sample_rate();
+            let sample_len = processor.fft_size();
+
             let mut supporting_points = Vec::new();
-            let mut supporting_point_infos = Vec::with_capacity(amount_bars);
+            let mut supporting_point_infos = Vec::new();
 
             // == preparations
-            let weights = (0..amount_bars)
-                .map(|index| exp_fun((index + 1) as f32 / (amount_bars + 1) as f32))
+            let weights = (0..usize::from(amount_bars))
+                .map(|index| exp_fun((index + 1) as f32 / (usize::from(amount_bars) + 1) as f32))
                 .collect::<Vec<f32>>();
             debug!("Weights: {:?}", weights);
 
@@ -69,8 +72,8 @@ impl Equalizer {
 
                 // the relevant index range of the fft output which we should use for the bars
                 let bin_range = Range {
-                    start: ((freq_range.start as f32 / freq_resolution) as usize).max(1),
-                    end: (freq_range.end as f32 / freq_resolution).ceil() as usize,
+                    start: ((u16::from(freq_range.start) as f32 / freq_resolution) as usize).max(1),
+                    end: (u16::from(freq_range.end) as f32 / freq_resolution).ceil() as usize,
                 };
                 debug!("Bin range: {:?}", bin_range);
                 bin_range.len()
@@ -105,15 +108,16 @@ impl Equalizer {
         };
 
         Self {
+            sensitivity: 1.,
             supporting_point_infos,
-            sensitivity: init_sensitivity.unwrap_or(DEFAULT_INIT_SENSITIVITY),
             interpolator,
-            interpolation,
+            config,
         }
     }
 
-    pub fn process(&mut self, fft_out: &[Complex32]) -> &[f32] {
-        let (overshoot, is_silent) = self.update_supporting_points(fft_out);
+    /// Returns the values for each bar.
+    pub fn process_bars(&mut self, processor: &SampleProcessor) -> &[f32] {
+        let (overshoot, is_silent) = self.update_supporting_points(processor.fft_out());
         if overshoot {
             self.sensitivity *= 0.98;
         } else if !is_silent {
@@ -123,19 +127,9 @@ impl Equalizer {
         self.interpolator.interpolate()
     }
 
-    pub fn sensitivity(&self) -> f32 {
-        self.sensitivity
-    }
-
-    pub fn interpolation(&self) -> InterpolationVariant {
-        self.interpolation
-    }
-
     fn update_supporting_points(&mut self, fft_out: &[Complex32]) -> (bool, bool) {
         let mut overshoot = false;
         let mut is_silent = true;
-
-        let amount_bars = self.interpolator.total_amount_entries();
 
         for (supporting_point, info) in self
             .interpolator
@@ -157,7 +151,9 @@ impl Equalizer {
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap();
 
-                self.sensitivity * raw_bar_val * 10f32.powf((x as f32 / amount_bars as f32) - 1.1)
+                self.sensitivity
+                    * raw_bar_val
+                    * 10f32.powf((x as f32 / usize::from(self.config.amount_bars) as f32) - 1.1)
             };
 
             debug_assert!(!prev_magnitude.is_nan());
@@ -187,6 +183,11 @@ impl Equalizer {
         }
 
         (overshoot, is_silent)
+    }
+
+    /// Returns its config.
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 }
 

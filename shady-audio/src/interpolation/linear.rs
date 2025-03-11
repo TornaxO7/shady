@@ -2,28 +2,25 @@ use std::slice::IterMut;
 
 use tracing::debug;
 
-use super::{context::InterpolationCtx, Interpolater, InterpolationInstantiator, SupportingPoint};
+use super::{context::InterpolationCtx, Interpolater, InterpolationInner, SupportingPoint};
 
 #[derive(Debug)]
 pub struct LinearInterpolation {
     ctx: InterpolationCtx,
-
-    values: Box<[f32]>,
 }
 
-impl InterpolationInstantiator for LinearInterpolation {
+impl InterpolationInner for LinearInterpolation {
     fn new(supporting_points: impl IntoIterator<Item = super::SupportingPoint>) -> Self {
         let ctx = InterpolationCtx::new(supporting_points);
-        let values = vec![0f32; ctx.total_amount_entries()].into_boxed_slice();
 
-        Self { ctx, values }
+        Self { ctx }
     }
 }
 
 impl Interpolater for LinearInterpolation {
     fn interpolate(&mut self) -> &[f32] {
         for point in self.ctx.supporting_points.iter() {
-            self.values[point.x] = point.y;
+            self.ctx.bar_values[point.x] = point.y;
         }
 
         debug!("{:?}", self.ctx);
@@ -37,19 +34,15 @@ impl Interpolater for LinearInterpolation {
                 let t = (interpolate_idx + 1) as f32 / (amount + 1) as f32;
 
                 let idx = left.x + interpolate_idx + 1;
-                self.values[idx] = t * right.y + (1. - t) * left.y;
+                self.ctx.bar_values[idx] = t * right.y + (1. - t) * left.y;
             }
         }
 
-        &self.values
+        &self.ctx.bar_values
     }
 
     fn supporting_points_mut(&mut self) -> IterMut<'_, SupportingPoint> {
         self.ctx.supporting_points.iter_mut()
-    }
-
-    fn total_amount_entries(&self) -> usize {
-        self.values.len()
     }
 }
 

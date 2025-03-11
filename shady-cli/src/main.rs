@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 use shady_audio::{
-    fetcher::SystemAudioFetcher, InterpolationVariant, ShadyAudio, ShadyAudioConfig,
+    fetcher::SystemAudioFetcher, BarProcessor, Config, InterpolationVariant, SampleProcessor,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -27,7 +27,8 @@ struct Ctx<'a> {
     bars: Vec<Bar<'a>>,
     color: Color,
 
-    audio: ShadyAudio,
+    sample_processor: SampleProcessor,
+    bar_processor: BarProcessor,
     interpolation: InterpolationVariant,
 }
 
@@ -44,11 +45,18 @@ impl<'a> Ctx<'a> {
             Bar::default().text_value("".to_string()),
         );
 
-        self.audio.set_bars(amount_bars);
+        self.bar_processor = BarProcessor::new(
+            &self.sample_processor,
+            Config {
+                amount_bars,
+                ..self.bar_processor.config().clone()
+            },
+        );
     }
 
     fn get_bars(&mut self) -> &[Bar<'a>] {
-        let bar_values = self.audio.get_bars();
+        self.sample_processor.process_next_samples();
+        let bar_values = self.bar_processor.process_bars(&self.sample_processor);
 
         for (value, bar) in bar_values.iter().zip(self.bars.iter_mut()) {
             *bar = bar.clone().value((HEIGHT as f32 * value) as u64);
@@ -64,7 +72,13 @@ impl<'a> Ctx<'a> {
             InterpolationVariant::CubicSpline => InterpolationVariant::None,
         };
 
-        self.audio.set_interopaltion_variant(self.interpolation);
+        self.bar_processor = BarProcessor::new(
+            &self.sample_processor,
+            Config {
+                interpolation: self.interpolation,
+                ..self.bar_processor.config().clone()
+            },
+        );
     }
 }
 
@@ -72,16 +86,18 @@ fn main() -> std::io::Result<()> {
     init_logger();
 
     let cli = Cli::parse();
-    let mut ctx = Ctx {
-        bar_width: 3,
-        bars: Vec::new(),
-        color: cli.color,
-        audio: ShadyAudio::new(
-            SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(),
-            ShadyAudioConfig::default(),
-        )
-        .unwrap(),
-        interpolation: InterpolationVariant::CubicSpline,
+    let mut ctx = {
+        let sample_processor =
+            SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+        let bar_processor = BarProcessor::new(&sample_processor, Config::default());
+        Ctx {
+            bar_width: 3,
+            bars: Vec::new(),
+            color: cli.color,
+            sample_processor,
+            bar_processor,
+            interpolation: InterpolationVariant::CubicSpline,
+        }
     };
 
     let mut terminal = ratatui::init();

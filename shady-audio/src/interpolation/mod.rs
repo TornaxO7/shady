@@ -11,31 +11,13 @@ pub use cubic_spline::CubicSplineInterpolation;
 pub use linear::LinearInterpolation;
 pub use nothing::NothingInterpolation;
 
-/// Decides which interpolation strategy should be used.
-#[derive(Debug, Clone, Copy, Hash)]
-pub enum InterpolationVariant {
-    /// No interpolation strategy should be used.
-    ///
-    /// Only the supporting bars which are calculated are going to be displayed.
-    None,
-
-    /// Use the linear interpolation.
-    Linear,
-
-    /// Use the cubic spline interpolation.
-    CubicSpline,
-}
-
 pub trait Interpolater {
     fn interpolate(&mut self) -> &[f32];
-
-    /// The length of the returned slice of `interpolate()`.
-    fn total_amount_entries(&self) -> usize;
 
     fn supporting_points_mut(&mut self) -> IterMut<'_, SupportingPoint>;
 }
 
-pub trait InterpolationInstantiator: Interpolater + Sized {
+pub trait InterpolationInner: Interpolater + Sized {
     fn new(supporting_points: impl IntoIterator<Item = SupportingPoint>) -> Self;
 
     fn boxed(supporting_points: impl IntoIterator<Item = SupportingPoint>) -> Box<Self> {

@@ -19,7 +19,7 @@ struct SampleBuffer {
 
 impl SampleBuffer {
     pub fn new(sample_rate: SampleRate, channels: u16) -> Self {
-        let capacity = (sample_rate.0 * 4) as usize;
+        let capacity = sample_rate.0 as usize;
         let buffer = vec![0.; capacity].into_boxed_slice();
 
         Self {
@@ -44,20 +44,21 @@ impl SampleBuffer {
 
         self.length = new_len;
     }
-
-    pub fn clear(&mut self) {
-        self.length = 0;
-    }
 }
 
+/// Errors which can occur while creating [crate::fetcher::SystemAudioFetcher].
 #[derive(thiserror::Error, Debug, Clone, Copy)]
 pub enum SystemAudioError {
+    /// No default audio device could be found to fetch from.
     #[error("Couldn't retrieve default output dev")]
     NoDefaultDevice,
 
+    /// [crate::fetcher::SystemAudioFetcher] requires the sample format to be `F32` but something
+    /// else was given from the audio source.
     #[error("Expected sample format F32 but got {0} instead.")]
     InvalidSampleFormat(SampleFormat),
 
+    /// No default configuration could be found of the default output device.
     #[error("Couldn't retrieve default config of the output stream of the default device.")]
     NoDefaultOutputStreamConfig,
 }
@@ -144,13 +145,6 @@ impl SystemAudio {
     /// # Args
     /// - `error_callback` will be passed to the
     ///   `error_callback` of [`cpal::traits::DeviceTrait::build_input_stream`].
-    ///
-    /// # Example
-    /// ```no_run
-    /// use shady_audio::{ShadyAudio, ShadyAudioConfig, fetcher::SystemAudioFetcher};
-    ///
-    /// let shady = ShadyAudio::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap(), ShadyAudioConfig::default());
-    /// ```
     pub fn default<E>(error_callback: E) -> Result<Box<Self>, SystemAudioError>
     where
         E: FnMut(StreamError) + Send + 'static,
@@ -177,11 +171,18 @@ impl Drop for SystemAudio {
 }
 
 impl Fetcher for SystemAudio {
-    fn fetch_samples(&mut self, buf: &mut Vec<f32>) {
+    fn fetch_samples(&mut self, buf: &mut [f32]) {
+        let buf_len = buf.len();
         let mut sample_buffer = self.sample_buffer.lock().unwrap();
-        buf.resize(sample_buffer.length, 0.);
-        buf.copy_from_slice(&sample_buffer.buffer[..sample_buffer.length]);
-        sample_buffer.clear();
+
+        let amount_samples = buf_len.min(sample_buffer.length);
+        let new_sample_buffer_len = sample_buffer.length - amount_samples;
+
+        buf.copy_within(..buf_len - amount_samples, amount_samples);
+        buf[..amount_samples]
+            .copy_from_slice(&sample_buffer.buffer[new_sample_buffer_len..sample_buffer.length]);
+
+        sample_buffer.length = new_sample_buffer_len;
     }
 
     fn sample_rate(&self) -> SampleRate {

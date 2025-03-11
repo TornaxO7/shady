@@ -1,6 +1,9 @@
 use image::{ImageBuffer, Rgba};
 use pollster::FutureExt;
-use shady::{Shady, ShadyDescriptor, ShadyRenderPipeline};
+use shady::{
+    shady_audio::{fetcher::SystemAudioFetcher, SampleProcessor},
+    Shady, ShadyDescriptor, ShadyRenderPipeline,
+};
 use wgpu::{
     Backends, Buffer, BufferView, Device, DeviceDescriptor, Extent3d, Instance, Queue,
     ShaderSource, Texture,
@@ -23,6 +26,7 @@ pub struct TextureState {
 
     device: Device,
     queue: Queue,
+    sample_processor: SampleProcessor,
     shady: Shady,
     pipeline: Option<ShadyRenderPipeline>,
 }
@@ -104,7 +108,12 @@ impl TextureState {
         let pipeline = shader_source
             .map(|source| shady::create_render_pipeline(&device, source, &texture_format));
 
-        let shady = Shady::new(ShadyDescriptor { device: &device });
+        let sample_processor =
+            SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+        let shady = Shady::new(ShadyDescriptor {
+            device: &device,
+            sample_processor: &sample_processor,
+        });
 
         Self {
             size: texture_size,
@@ -113,6 +122,7 @@ impl TextureState {
             device,
             queue,
             shady,
+            sample_processor,
             output_buffer,
             pipeline,
         }
@@ -123,7 +133,11 @@ impl<'a> RenderState<'a> for TextureState {
     fn prepare_next_frame(&mut self) {
         self.shady.inc_frame();
 
-        self.shady.update_audio_buffer(&mut self.queue);
+        {
+            self.sample_processor.process_next_samples();
+            self.shady
+                .update_audio_buffer(&mut self.queue, &self.sample_processor);
+        }
         self.shady.update_frame_buffer(&mut self.queue);
         self.shady.update_mouse_buffer(&mut self.queue);
         self.shady.update_resolution_buffer(&mut self.queue);

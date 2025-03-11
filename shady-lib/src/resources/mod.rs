@@ -28,7 +28,7 @@ use wgpu::Device;
 #[cfg(feature = "mouse")]
 pub use mouse::MouseState;
 
-use crate::template::TemplateGenerator;
+use crate::{template::TemplateGenerator, ShadyDescriptor};
 
 #[repr(u32)]
 enum BindingValue {
@@ -45,7 +45,7 @@ enum BindingValue {
 }
 
 pub trait Resource: TemplateGenerator {
-    fn new(device: &Device) -> Self;
+    fn new(desc: &ShadyDescriptor) -> Self;
 
     fn binding() -> u32;
 
@@ -94,19 +94,19 @@ pub struct Resources {
 }
 
 impl Resources {
-    #[instrument(level = "trace")]
-    pub fn new(device: &wgpu::Device) -> Self {
+    #[instrument(level = "trace", skip_all)]
+    pub fn new(desc: &ShadyDescriptor) -> Self {
         Self {
             #[cfg(feature = "audio")]
-            audio: Audio::new(device),
+            audio: Audio::new(desc),
             #[cfg(feature = "frame")]
-            frame: Frame::new(device),
+            frame: Frame::new(desc),
             #[cfg(feature = "mouse")]
-            mouse: Mouse::new(device),
+            mouse: Mouse::new(desc),
             #[cfg(feature = "resolution")]
-            resolution: Resolution::new(device),
+            resolution: Resolution::new(desc),
             #[cfg(feature = "time")]
-            time: Time::new(device),
+            time: Time::new(desc),
         }
     }
 }

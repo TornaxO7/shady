@@ -1,7 +1,10 @@
 use cpal::SampleRate;
 use realfft::{num_complex::Complex32, RealFftPlanner};
 
-pub struct FftCalculator {
+use crate::fetcher::Fetcher;
+
+/// Prepares the samples of the fetcher for the [crate::BarProcessor].
+pub struct SampleProcessor {
     planner: RealFftPlanner<f32>,
     hann_window: Box<[f32]>,
 
@@ -11,12 +14,14 @@ pub struct FftCalculator {
     fft_in_raw: Box<[f32]>,
 
     fft_size: usize,
+    fetcher: Box<dyn Fetcher>,
 }
 
-impl FftCalculator {
-    pub fn new(sample_rate: SampleRate) -> Self {
+impl SampleProcessor {
+    /// Creates a new instance with the given fetcher where the audio samples are fetched from.
+    pub fn new(fetcher: Box<dyn Fetcher>) -> Self {
         let fft_size = {
-            let sample_rate = sample_rate.0;
+            let sample_rate = fetcher.sample_rate().0;
             let factor = if sample_rate < 8_125 {
                 1
             } else if sample_rate <= 16_250 {
@@ -56,16 +61,14 @@ impl FftCalculator {
             fft_in_raw,
 
             fft_size,
+            fetcher,
         }
     }
 
-    #[inline]
-    pub fn process(&mut self, new_samples: &[f32]) -> &[Complex32] {
-        let new_len = new_samples.len().min(self.fft_size);
-
-        self.fft_in_raw
-            .copy_within(..self.fft_size - new_len, new_len);
-        self.fft_in_raw[..new_len].copy_from_slice(&new_samples[..new_len]);
+    /// Tell the processor to take some samples of the fetcher and prepare them
+    /// for the [crate::BarProcessor]s.
+    pub fn process_next_samples(&mut self) {
+        self.fetcher.fetch_samples(&mut self.fft_in_raw);
 
         for (i, &sample) in self.fft_in_raw.iter().enumerate() {
             self.fft_in[i] = sample * self.hann_window[i];
@@ -73,16 +76,24 @@ impl FftCalculator {
 
         let fft = self.planner.plan_fft_forward(self.fft_size);
         fft.process_with_scratch(
-            &mut self.fft_in,
+            self.fft_in.as_mut(),
             self.fft_out.as_mut(),
             self.scratch_buffer.as_mut(),
         )
         .unwrap();
+    }
+}
 
+impl SampleProcessor {
+    pub(crate) fn fft_size(&self) -> usize {
+        self.fft_size
+    }
+
+    pub(crate) fn fft_out(&self) -> &[Complex32] {
         &self.fft_out
     }
 
-    pub fn size(&self) -> usize {
-        self.fft_size
+    pub(crate) fn sample_rate(&self) -> SampleRate {
+        self.fetcher.sample_rate()
     }
 }

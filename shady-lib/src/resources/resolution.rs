@@ -1,8 +1,6 @@
 use std::fmt;
 
-use wgpu::Device;
-
-use crate::template::TemplateGenerator;
+use crate::{template::TemplateGenerator, ShadyDescriptor};
 
 use super::Resource;
 
@@ -24,8 +22,9 @@ impl Resolution {
 }
 
 impl Resource for Resolution {
-    fn new(device: &Device) -> Self {
-        let buffer = Self::create_uniform_buffer(device, std::mem::size_of::<[f32; 2]>() as u64);
+    fn new(desc: &ShadyDescriptor) -> Self {
+        let buffer =
+            Self::create_uniform_buffer(desc.device, std::mem::size_of::<[f32; 2]>() as u64);
 
         Self {
             width: 0,
