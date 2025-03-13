@@ -74,7 +74,13 @@ impl Resource for Audio {
             std::mem::size_of::<[f32; DEFAULT_AMOUNT_BARS]>() as u64,
         );
 
-        let bar_processor = BarProcessor::new(desc.sample_processor, Config::default());
+        let bar_processor = BarProcessor::new(
+            desc.sample_processor,
+            Config {
+                amount_bars: NonZeroUsize::new(DEFAULT_AMOUNT_BARS).unwrap(),
+                ..Default::default()
+            },
+        );
 
         let audio_buffer = Box::new([0.; DEFAULT_AMOUNT_BARS]);
 
