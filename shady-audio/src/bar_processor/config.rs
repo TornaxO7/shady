@@ -1,7 +1,4 @@
-use std::{
-    num::{NonZero, NonZeroU16, NonZeroUsize},
-    ops::Range,
-};
+use std::{num::NonZero, ops::Range};
 
 /// Decides which interpolation strategy for the bars.
 #[derive(Debug, Clone, Copy, Hash)]
@@ -23,10 +20,10 @@ pub enum InterpolationVariant {
 #[derive(Debug, Clone)]
 pub struct Config {
     /// Set the amount of bars which should be created.
-    pub amount_bars: NonZeroUsize,
+    pub amount_bars: NonZero<u16>,
 
     /// Set the frequency range which the bar processor should consider.
-    pub freq_range: Range<NonZeroU16>,
+    pub freq_range: Range<NonZero<u16>>,
 
     /// Decide how the bar values should be interpolated.
     pub interpolation: InterpolationVariant,

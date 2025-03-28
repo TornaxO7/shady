@@ -61,8 +61,8 @@ impl BarProcessor {
             let mut supporting_point_infos = Vec::new();
 
             // == preparations
-            let weights = (0..usize::from(amount_bars))
-                .map(|index| exp_fun((index + 1) as f32 / (usize::from(amount_bars) + 1) as f32))
+            let weights = (0..u16::from(amount_bars))
+                .map(|index| exp_fun((index + 1) as f32 / (u16::from(amount_bars) + 1) as f32))
                 .collect::<Vec<f32>>();
             debug!("Weights: {:?}", weights);
 
@@ -153,7 +153,7 @@ impl BarProcessor {
 
                 self.sensitivity
                     * raw_bar_val
-                    * 10f32.powf((x as f32 / usize::from(self.config.amount_bars) as f32) - 1.1)
+                    * 10f32.powf((x as f32 / u16::from(self.config.amount_bars) as f32) - 1.1)
             };
 
             debug_assert!(!prev_magnitude.is_nan());

@@ -34,17 +34,17 @@
 //! You can also create multiple [BarProcessor]s with different configs.
 //!
 //! ```
-//! use std::num::NonZeroUsize;
+//! use std::num::NonZero;
 //! use shady_audio::{SampleProcessor, BarProcessor, Config, fetcher::DummyFetcher};
 //!
 //! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
 //!
 //! let mut bar_processor = BarProcessor::new(&sample_processor, Config {
-//!   amount_bars: NonZeroUsize::new(20).unwrap(),
+//!   amount_bars: NonZero::new(20).unwrap(),
 //!   ..Default::default()
 //! });
 //! let mut bar_processor2 = BarProcessor::new(&sample_processor, Config {
-//!   amount_bars: NonZeroUsize::new(10).unwrap(),
+//!   amount_bars: NonZero::new(10).unwrap(),
 //!   ..Default::default()
 //! });
 //!
@@ -67,12 +67,12 @@
 //! You have to create a new [BarProcessor] if you want to change it's behaviour like the amount
 //! of bars it should output.
 //! ```
-//! use std::num::NonZeroUsize;
+//! use std::num::NonZero;
 //! use shady_audio::{SampleProcessor, BarProcessor, Config, fetcher::DummyFetcher};
 //!
 //! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
 //! let mut bar_processor = BarProcessor::new(&sample_processor, Config {
-//!     amount_bars: NonZeroUsize::new(20).unwrap(),
+//!     amount_bars: NonZero::new(20).unwrap(),
 //!     ..Default::default()
 //! });
 //!
@@ -80,7 +80,7 @@
 //!
 //! // change the amount of bars
 //! bar_processor = BarProcessor::new(&sample_processor, Config {
-//!    amount_bars: NonZeroUsize::new(10).unwrap(),
+//!    amount_bars: NonZero::new(10).unwrap(),
 //!    ..bar_processor.config().clone()
 //! });
 //!
@@ -98,7 +98,7 @@ pub use sample_processor::SampleProcessor;
 
 use cpal::SampleRate;
 
-type Hz = u32;
+type Hz = u16;
 
 /// The minimal frequency which humans can here (roughly)
 /// See: <https://en.wikipedia.org/wiki/Hearing_range>
