@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::{fs::File, num::NonZeroUsize, time::Duration};
+use std::{fs::File, num::NonZero, time::Duration};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
@@ -33,15 +33,15 @@ struct Ctx<'a> {
 }
 
 impl<'a> Ctx<'a> {
-    fn amount_bars(&self, columns: u16) -> NonZeroUsize {
-        NonZeroUsize::new((columns / self.bar_width) as usize).unwrap()
+    fn amount_bars(&self, columns: u16) -> NonZero<u16> {
+        NonZero::new(columns / self.bar_width).unwrap()
     }
 
     fn set_bars(&mut self, columns: u16) {
         let amount_bars = self.amount_bars(columns);
 
         self.bars.resize(
-            usize::from(amount_bars),
+            usize::from(u16::from(amount_bars)),
             Bar::default().text_value("".to_string()),
         );
 
