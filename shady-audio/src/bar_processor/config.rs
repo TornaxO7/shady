@@ -27,6 +27,15 @@ pub struct Config {
 
     /// Decide how the bar values should be interpolated.
     pub interpolation: InterpolationVariant,
+
+    /// Control how fast the bars should adjust to their new height.
+    /// It has to be within the range `[0, 1]`.
+    ///
+    /// The smaller the value, the slower a height change per bar happens.
+    /// The higher the value, the "more" the bar jumps up and down.
+    /// So in general the rule of thumb is: The more often you call the `BarProcessor` the smaller
+    /// this option needs to be.
+    pub sensitivity: f32,
 }
 
 impl Default for Config {
@@ -35,6 +44,7 @@ impl Default for Config {
             interpolation: InterpolationVariant::CubicSpline,
             amount_bars: NonZero::new(30).unwrap(),
             freq_range: NonZero::new(50).unwrap()..NonZero::new(10_000).unwrap(),
+            sensitivity: 0.2,
         }
     }
 }

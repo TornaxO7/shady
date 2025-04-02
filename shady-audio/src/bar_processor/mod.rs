@@ -33,8 +33,12 @@ impl SupportingPointInfo {
 }
 
 /// The struct which computates the bar values of the samples of the fetcher.
+//
+// TODO: Optionen hinzufügen:
+//    1. Empfindlichkeit
+//    2. Option die Stützpunkte mit gleichem Abstand hinzupacken
 pub struct BarProcessor {
-    sensitivity: f32,
+    normalize_factor: f32,
 
     supporting_point_infos: Box<[SupportingPointInfo]>,
     interpolator: Box<dyn Interpolater>,
@@ -51,6 +55,7 @@ impl BarProcessor {
             interpolation,
             amount_bars,
             freq_range,
+            ..
         } = config.clone();
 
         let (supporting_points, supporting_point_infos) = {
@@ -108,7 +113,7 @@ impl BarProcessor {
         };
 
         Self {
-            sensitivity: 1.,
+            normalize_factor: 1.,
             supporting_point_infos,
             interpolator,
             config,
@@ -119,9 +124,9 @@ impl BarProcessor {
     pub fn process_bars(&mut self, processor: &SampleProcessor) -> &[f32] {
         let (overshoot, is_silent) = self.update_supporting_points(processor.fft_out());
         if overshoot {
-            self.sensitivity *= 0.98;
+            self.normalize_factor *= 0.98;
         } else if !is_silent {
-            self.sensitivity *= 1.002;
+            self.normalize_factor *= 1.002;
         }
 
         self.interpolator.interpolate()
@@ -151,7 +156,7 @@ impl BarProcessor {
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap();
 
-                self.sensitivity
+                self.normalize_factor
                     * raw_bar_val
                     * 10f32.powf((x as f32 / u16::from(self.config.amount_bars) as f32) - 1.1)
             };
@@ -166,14 +171,16 @@ impl BarProcessor {
             } else {
                 let was_falling_before = info.started_falling;
                 let is_falling = next_magnitude < prev_magnitude;
+                let starts_falling = is_falling && !was_falling_before;
 
-                if is_falling && !was_falling_before {
+                if starts_falling {
                     info.started_falling = true;
-                    supporting_point.y += (next_magnitude - prev_magnitude) * 0.1;
+                    supporting_point.y += (next_magnitude - prev_magnitude)
+                        * rel_change.min(self.config.sensitivity / 2.);
                 } else {
                     info.started_falling = false;
                     supporting_point.y +=
-                        (next_magnitude - prev_magnitude) * rel_change.clamp(0.05, 0.2);
+                        (next_magnitude - prev_magnitude) * rel_change.min(self.config.sensitivity);
                 }
             }
 
