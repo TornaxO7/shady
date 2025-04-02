@@ -16,6 +16,12 @@ pub enum InterpolationVariant {
     CubicSpline,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Sensitivity {
+    pub min: f32,
+    pub max: f32,
+}
+
 /// The config options for [crate::BarProcessor].
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -29,13 +35,13 @@ pub struct Config {
     pub interpolation: InterpolationVariant,
 
     /// Control how fast the bars should adjust to their new height.
-    /// It has to be within the range `[0, 1]`.
     ///
-    /// The smaller the value, the slower a height change per bar happens.
-    /// The higher the value, the "more" the bar jumps up and down.
-    /// So in general the rule of thumb is: The more often you call the `BarProcessor` the smaller
-    /// this option needs to be.
-    pub sensitivity: f32,
+    /// - `min`: How "fast" the bar should jump at least.
+    /// - `max`: How "fast" the bar should jump at most.
+    ///
+    /// `min` and `max` should be within the range `[0, 1]`.
+    /// You should play around with those values until you like the sensitivity of the bars.
+    pub sensitivity: Sensitivity,
 }
 
 impl Default for Config {
@@ -44,7 +50,7 @@ impl Default for Config {
             interpolation: InterpolationVariant::CubicSpline,
             amount_bars: NonZero::new(30).unwrap(),
             freq_range: NonZero::new(50).unwrap()..NonZero::new(10_000).unwrap(),
-            sensitivity: 0.2,
+            sensitivity: Sensitivity { min: 0.1, max: 0.2 },
         }
     }
 }

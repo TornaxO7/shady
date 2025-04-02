@@ -2,7 +2,7 @@ mod config;
 
 use std::ops::Range;
 
-pub use config::{Config, InterpolationVariant};
+pub use config::{Config, InterpolationVariant, Sensitivity};
 use realfft::num_complex::Complex32;
 use tracing::debug;
 
@@ -14,33 +14,11 @@ use crate::{
     SampleProcessor, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
 };
 
-/// Additional information about the supporting points
-#[derive(Debug)]
-struct SupportingPointInfo {
-    /// which fft bins of the fft output should be used for the given bar
-    fft_bin_range: Range<usize>,
-    /// if the bar just started falling
-    started_falling: bool,
-}
-
-impl SupportingPointInfo {
-    pub fn new(fft_bin_range: Range<usize>) -> Self {
-        Self {
-            fft_bin_range,
-            started_falling: false,
-        }
-    }
-}
-
 /// The struct which computates the bar values of the samples of the fetcher.
-//
-// TODO: Optionen hinzufügen:
-//    1. Empfindlichkeit
-//    2. Option die Stützpunkte mit gleichem Abstand hinzupacken
 pub struct BarProcessor {
     normalize_factor: f32,
 
-    supporting_point_infos: Box<[SupportingPointInfo]>,
+    supporting_point_fft_ranges: Box<[Range<usize>]>,
     interpolator: Box<dyn Interpolater>,
 
     config: Config,
@@ -58,12 +36,12 @@ impl BarProcessor {
             ..
         } = config.clone();
 
-        let (supporting_points, supporting_point_infos) = {
+        let (supporting_points, supporting_point_fft_ranges) = {
             let sample_rate = processor.sample_rate();
             let sample_len = processor.fft_size();
 
             let mut supporting_points = Vec::new();
-            let mut supporting_point_infos = Vec::new();
+            let mut supporting_point_fft_ranges = Vec::new();
 
             // == preparations
             let weights = (0..u16::from(amount_bars))
@@ -97,13 +75,16 @@ impl BarProcessor {
                 if is_supporting_point {
                     supporting_points.push(SupportingPoint { x: bar_idx, y: 0. });
 
-                    supporting_point_infos.push(SupportingPointInfo::new(new_fft_range.clone()));
+                    supporting_point_fft_ranges.push(new_fft_range.clone());
                 }
 
                 prev_fft_range = new_fft_range;
             }
 
-            (supporting_points, supporting_point_infos.into_boxed_slice())
+            (
+                supporting_points,
+                supporting_point_fft_ranges.into_boxed_slice(),
+            )
         };
 
         let interpolator: Box<dyn Interpolater> = match interpolation {
@@ -114,7 +95,7 @@ impl BarProcessor {
 
         Self {
             normalize_factor: 1.,
-            supporting_point_infos,
+            supporting_point_fft_ranges,
             interpolator,
             config,
         }
@@ -136,15 +117,22 @@ impl BarProcessor {
         let mut overshoot = false;
         let mut is_silent = true;
 
-        for (supporting_point, info) in self
+        let ease = |x: f32| {
+            debug_assert!(0. <= x);
+            debug_assert!(x <= 1.);
+
+            (x + 1.).log10() * self.config.sensitivity.max + self.config.sensitivity.min
+        };
+
+        for (supporting_point, fft_range) in self
             .interpolator
             .supporting_points_mut()
-            .zip(self.supporting_point_infos.iter_mut())
+            .zip(self.supporting_point_fft_ranges.iter_mut())
         {
             let x = supporting_point.x;
             let prev_magnitude = supporting_point.y;
             let next_magnitude = {
-                let raw_bar_val = fft_out[info.fft_bin_range.clone()]
+                let raw_bar_val = fft_out[fft_range.clone()]
                     .iter()
                     .map(|out| {
                         let mag = out.norm();
@@ -164,24 +152,11 @@ impl BarProcessor {
             debug_assert!(!prev_magnitude.is_nan());
             debug_assert!(!next_magnitude.is_nan());
 
-            let rel_change = next_magnitude / prev_magnitude;
             if is_silent {
                 supporting_point.y *= 0.75;
-                info.started_falling = false;
             } else {
-                let was_falling_before = info.started_falling;
-                let is_falling = next_magnitude < prev_magnitude;
-                let starts_falling = is_falling && !was_falling_before;
-
-                if starts_falling {
-                    info.started_falling = true;
-                    supporting_point.y += (next_magnitude - prev_magnitude)
-                        * rel_change.min(self.config.sensitivity / 2.);
-                } else {
-                    info.started_falling = false;
-                    supporting_point.y +=
-                        (next_magnitude - prev_magnitude) * rel_change.min(self.config.sensitivity);
-                }
+                let diff = next_magnitude - prev_magnitude;
+                supporting_point.y += diff * ease(diff.abs().min(1.0));
             }
 
             if supporting_point.y > 1. {

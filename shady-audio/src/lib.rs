@@ -92,7 +92,7 @@ mod bar_processor;
 mod interpolation;
 mod sample_processor;
 
-pub use bar_processor::{BarProcessor, Config, InterpolationVariant};
+pub use bar_processor::{BarProcessor, Config, InterpolationVariant, Sensitivity};
 pub use cpal;
 pub use sample_processor::SampleProcessor;
 
