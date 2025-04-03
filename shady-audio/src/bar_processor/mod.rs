@@ -2,6 +2,7 @@ mod config;
 
 use std::ops::Range;
 
+use config::BarDistribution;
 pub use config::{Config, InterpolationVariant, Sensitivity};
 use realfft::num_complex::Complex32;
 use tracing::debug;
@@ -63,7 +64,7 @@ impl BarProcessor {
             };
             debug!("Available bins: {}", amount_bins);
 
-            // == calculate sections
+            // == supporting points
             let mut prev_fft_range = 0..0;
             for (bar_idx, weight) in weights.iter().enumerate() {
                 let end =
@@ -79,6 +80,22 @@ impl BarProcessor {
                 }
 
                 prev_fft_range = new_fft_range;
+            }
+
+            // re-adjust the supporting points if needed
+            match config.bar_distribution {
+                BarDistribution::Uniform => {
+                    let step = u16::from(amount_bars) as f32 / supporting_points.len() as f32;
+                    let supporting_points_len = supporting_points.len();
+                    for (idx, supporting_point) in supporting_points
+                        [..supporting_points_len.saturating_sub(1)]
+                        .iter_mut()
+                        .enumerate()
+                    {
+                        supporting_point.x = (idx as f32 * step) as usize;
+                    }
+                }
+                BarDistribution::Natural => {}
             }
 
             (

@@ -16,9 +16,30 @@ pub enum InterpolationVariant {
     CubicSpline,
 }
 
+/// Set the distribution of the bars.
+#[derive(Debug, Clone, Copy, Hash, Default)]
+pub enum BarDistribution {
+    /// Tell the [`Barprocessor`] to distribute the bars so that the frequency spectrum
+    /// looks like as if it would grow linear or in other words:
+    /// To make the bars look "natural" to us.
+    #[default]
+    Uniform,
+
+    /// Don't readjust the frequency bars so that it looks "natural" to us but
+    /// physically correct.
+    Natural,
+}
+
+/// Sets the "changing rate" of the bars.
+///
+/// `min` and `max` should be within the range `[0, 1]` for reasonable results.
+/// You should play around with those values until you like the sensitivity of the bars.
 #[derive(Debug, Clone, Copy)]
 pub struct Sensitivity {
+    /// The minimum "changing-rate".
     pub min: f32,
+
+    /// The maximum "changing-rate".
     pub max: f32,
 }
 
@@ -35,13 +56,11 @@ pub struct Config {
     pub interpolation: InterpolationVariant,
 
     /// Control how fast the bars should adjust to their new height.
-    ///
-    /// - `min`: How "fast" the bar should jump at least.
-    /// - `max`: How "fast" the bar should jump at most.
-    ///
-    /// `min` and `max` should be within the range `[0, 1]`.
-    /// You should play around with those values until you like the sensitivity of the bars.
     pub sensitivity: Sensitivity,
+
+    /// Set the bar distribution.
+    /// In general you needn't use another value than its default.
+    pub bar_distribution: BarDistribution,
 }
 
 impl Default for Config {
@@ -51,6 +70,7 @@ impl Default for Config {
             amount_bars: NonZero::new(30).unwrap(),
             freq_range: NonZero::new(50).unwrap()..NonZero::new(10_000).unwrap(),
             sensitivity: Sensitivity { min: 0.1, max: 0.2 },
+            bar_distribution: BarDistribution::Uniform,
         }
     }
 }

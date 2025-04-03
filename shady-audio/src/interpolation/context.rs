@@ -64,6 +64,15 @@ impl std::fmt::Debug for InterpolationCtx {
         let mut sp_iter = self.supporting_points.iter().enumerate().peekable();
         let mut s_iter = self.sections.iter().peekable();
 
+        writeln!(f)?;
+        writeln!(
+            f,
+            "Amount supporting points: {}",
+            self.supporting_points.len()
+        )?;
+        writeln!(f, "Amount sections: {}", self.sections.len())?;
+        writeln!(f, "Supporting point and sections:")?;
+
         loop {
             match (sp_iter.peek(), s_iter.peek()) {
                 (Some((sp_idx, sp)), Some(s)) => {
