@@ -75,7 +75,7 @@ impl std::fmt::Debug for InterpolationCtx {
                         s_iter.next();
                     }
                 }
-                (Some(sp), None) => {
+                (Some((_sp_idx, sp)), None) => {
                     write!(f, "{:?}", sp)?;
                     sp_iter.next();
                 }
