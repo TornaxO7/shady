@@ -1,7 +1,5 @@
 use tracing::debug;
 
-use std::fmt::Write;
-
 use super::{InterpolationSection, SupportingPoint};
 
 #[derive(Clone)]
