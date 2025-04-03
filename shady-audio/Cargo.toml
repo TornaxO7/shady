@@ -1,6 +1,6 @@
 [package]
 name = "shady-audio"
-version = "8.0.0"
+version = "9.0.0"
 edition = "2021"
 authors = ["TornaxO7 <tornax@pm.me>"]
 description = "A high level library build upon cpal to retrieve audio for visualisation."
