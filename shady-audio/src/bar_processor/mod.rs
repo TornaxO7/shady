@@ -117,7 +117,7 @@ impl BarProcessor {
         let mut overshoot = false;
         let mut is_silent = true;
 
-        let ease = |x: f32| {
+        let ease_bar = |x: f32| {
             debug_assert!(0. <= x);
             debug_assert!(x <= 1.);
 
@@ -132,10 +132,10 @@ impl BarProcessor {
             let x = supporting_point.x;
             let prev_magnitude = supporting_point.y;
             let next_magnitude = {
-                let raw_bar_val = fft_out[fft_range.clone()]
+                let mut raw_bar_val = fft_out[fft_range.clone()]
                     .iter()
                     .map(|out| {
-                        let mag = out.norm();
+                        let mag = out.norm_sqr();
                         if mag > 0. {
                             is_silent = false;
                         }
@@ -143,6 +143,8 @@ impl BarProcessor {
                     })
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap();
+
+                raw_bar_val = raw_bar_val.sqrt();
 
                 self.normalize_factor
                     * raw_bar_val
@@ -156,7 +158,7 @@ impl BarProcessor {
                 supporting_point.y *= 0.75;
             } else {
                 let diff = next_magnitude - prev_magnitude;
-                supporting_point.y += diff * ease(diff.abs().min(1.0));
+                supporting_point.y += diff * ease_bar(diff.abs().min(1.0));
             }
 
             if supporting_point.y > 1. {

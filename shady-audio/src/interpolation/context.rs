@@ -1,5 +1,7 @@
 use tracing::debug;
 
+use std::fmt::Write;
+
 use super::{InterpolationSection, SupportingPoint};
 
 #[derive(Clone)]
@@ -61,13 +63,13 @@ impl InterpolationCtx {
 
 impl std::fmt::Debug for InterpolationCtx {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut sp_iter = self.supporting_points.iter().peekable();
+        let mut sp_iter = self.supporting_points.iter().enumerate().peekable();
         let mut s_iter = self.sections.iter().peekable();
 
         loop {
             match (sp_iter.peek(), s_iter.peek()) {
-                (Some(sp), Some(s)) => {
-                    if sp.x <= s.left_supporting_point_idx {
+                (Some((sp_idx, sp)), Some(s)) => {
+                    if *sp_idx <= s.left_supporting_point_idx {
                         write!(f, "{:?}", sp)?;
                         sp_iter.next();
                     } else {
@@ -208,6 +210,31 @@ mod tests {
                 InterpolationSection {
                     left_supporting_point_idx: 1,
                     amount: 1
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn three_points_two_big_sections() {
+        let supporting_points = [
+            SupportingPoint { x: 0, y: 0.0 },
+            SupportingPoint { x: 5, y: 0.0 },
+            SupportingPoint { x: 10, y: 0.0 },
+        ];
+
+        let ctx = InterpolationCtx::new(supporting_points.clone());
+
+        assert_eq!(
+            ctx.sections.as_ref(),
+            &[
+                InterpolationSection {
+                    left_supporting_point_idx: 0,
+                    amount: 4
+                },
+                InterpolationSection {
+                    left_supporting_point_idx: 1,
+                    amount: 4
                 }
             ]
         );
