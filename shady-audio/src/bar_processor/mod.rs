@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use config::BarDistribution;
 pub use config::{BarProcessorConfig, InterpolationVariant};
-use easing_function::Easing;
+use easing_function::{Easing, EasingFunction};
 use realfft::num_complex::Complex32;
 use tracing::debug;
 
@@ -24,22 +24,19 @@ pub struct BarProcessor {
     interpolator: Box<dyn Interpolater>,
 
     config: BarProcessorConfig,
-    easer: Box<dyn Easing>,
+    easer: EasingFunction,
 }
 
 impl BarProcessor {
     /// Creates a new instance.
     ///
     /// See the examples of this crate to see it's usage.
-    pub fn new(
-        processor: &SampleProcessor,
-        easer: Box<dyn Easing>,
-        config: BarProcessorConfig,
-    ) -> Self {
+    pub fn new(processor: &SampleProcessor, config: BarProcessorConfig) -> Self {
         let BarProcessorConfig {
             interpolation,
             amount_bars,
             freq_range,
+            easer,
             ..
         } = config.clone();
 
@@ -121,7 +118,7 @@ impl BarProcessor {
             supporting_point_fft_ranges,
             interpolator,
             config,
-            easer,
+            easer: EasingFunction::from(easer),
         }
     }
 
@@ -176,7 +173,7 @@ impl BarProcessor {
             } else {
                 let diff = next_magnitude - prev_magnitude;
                 supporting_point.y +=
-                    diff * self.easer.ease(diff.abs().min(1.0)) * self.config.sensitivity;
+                    diff * self.easer.ease(diff.abs().min(1.0)) * self.config.max_sensitivity;
             }
 
             if supporting_point.y > 1. {

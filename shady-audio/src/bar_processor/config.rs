@@ -1,5 +1,7 @@
 use std::{num::NonZero, ops::Range};
 
+use easing_function::easings::StandardEasing;
+
 /// Decides which interpolation strategy for the bars.
 #[derive(Debug, Clone, Copy, Hash)]
 pub enum InterpolationVariant {
@@ -43,12 +45,15 @@ pub struct BarProcessorConfig {
     pub interpolation: InterpolationVariant,
 
     /// Control how fast the bars should adjust to their new height.
-    /// Shouldu be within the range `[0, 1`.
-    pub sensitivity: f32,
+    /// Shouldu be within the range `[0, 1]`.
+    pub max_sensitivity: f32,
 
     /// Set the bar distribution.
     /// In general you needn't use another value than its default.
     pub bar_distribution: BarDistribution,
+
+    /// Set the easing for the bar processor.
+    pub easer: StandardEasing,
 }
 
 impl Default for BarProcessorConfig {
@@ -57,8 +62,9 @@ impl Default for BarProcessorConfig {
             interpolation: InterpolationVariant::CubicSpline,
             amount_bars: NonZero::new(30).unwrap(),
             freq_range: NonZero::new(50).unwrap()..NonZero::new(10_000).unwrap(),
-            sensitivity: 0.2,
+            max_sensitivity: 0.2,
             bar_distribution: BarDistribution::Uniform,
+            easer: StandardEasing::OutCircular,
         }
     }
 }

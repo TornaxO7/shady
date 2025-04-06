@@ -18,7 +18,6 @@
 //! // Note: The bar procesor is intended to only work with the given sample processor.
 //! let mut bar_processor = BarProcessor::new(
 //!     &sample_processor,
-//!     Box::new(shady_audio::easing_function::easings::EaseInBack),
 //!     BarProcessorConfig::default()
 //! );
 //!
@@ -45,7 +44,6 @@
 //!
 //! let mut bar_processor = BarProcessor::new(
 //!     &sample_processor,
-//!     Box::new(shady_audio::easing_function::easings::EaseInOutBack),
 //!     BarProcessorConfig {
 //!         amount_bars: NonZero::new(20).unwrap(),
 //!         ..Default::default()
@@ -53,7 +51,6 @@
 //! );
 //! let mut bar_processor2 = BarProcessor::new(
 //!     &sample_processor,
-//!     Box::new(shady_audio::easing_function::easings::EaseInOutBack),
 //!     BarProcessorConfig {
 //!         amount_bars: NonZero::new(10).unwrap(),
 //!         ..Default::default()
@@ -85,7 +82,6 @@
 //! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
 //! let mut bar_processor = BarProcessor::new(
 //!     &sample_processor,
-//!     Box::new(shady_audio::easing_function::easings::EaseInOutSine),
 //!     BarProcessorConfig {
 //!         amount_bars: NonZero::new(20).unwrap(),
 //!     ..Default::default()
@@ -97,7 +93,6 @@
 //! // change the amount of bars
 //! bar_processor = BarProcessor::new(
 //!     &sample_processor,
-//!     Box::new(shady_audio::easing_function::easings::EaseInOutSine),
 //!     BarProcessorConfig {
 //!         amount_bars: NonZero::new(10).unwrap(),
 //!        ..bar_processor.config().clone()
@@ -114,7 +109,7 @@ mod sample_processor;
 
 pub use bar_processor::{BarProcessor, BarProcessorConfig, InterpolationVariant};
 pub use cpal;
-pub use easing_function;
+pub use easing_function::easings::StandardEasing;
 pub use sample_processor::SampleProcessor;
 
 use cpal::SampleRate;
