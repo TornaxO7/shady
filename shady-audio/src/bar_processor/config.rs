@@ -30,22 +30,9 @@ pub enum BarDistribution {
     Natural,
 }
 
-/// Sets the "changing rate" of the bars.
-///
-/// `min` and `max` should be within the range `[0, 1]` for reasonable results.
-/// You should play around with those values until you like the sensitivity of the bars.
-#[derive(Debug, Clone, Copy)]
-pub struct Sensitivity {
-    /// The minimum "changing-rate".
-    pub min: f32,
-
-    /// The maximum "changing-rate".
-    pub max: f32,
-}
-
 /// The config options for [crate::BarProcessor].
 #[derive(Debug, Clone)]
-pub struct Config {
+pub struct BarProcessorConfig {
     /// Set the amount of bars which should be created.
     pub amount_bars: NonZero<u16>,
 
@@ -56,20 +43,21 @@ pub struct Config {
     pub interpolation: InterpolationVariant,
 
     /// Control how fast the bars should adjust to their new height.
-    pub sensitivity: Sensitivity,
+    /// Shouldu be within the range `[0, 1`.
+    pub sensitivity: f32,
 
     /// Set the bar distribution.
     /// In general you needn't use another value than its default.
     pub bar_distribution: BarDistribution,
 }
 
-impl Default for Config {
+impl Default for BarProcessorConfig {
     fn default() -> Self {
         Self {
             interpolation: InterpolationVariant::CubicSpline,
             amount_bars: NonZero::new(30).unwrap(),
             freq_range: NonZero::new(50).unwrap()..NonZero::new(10_000).unwrap(),
-            sensitivity: Sensitivity { min: 0.1, max: 0.2 },
+            sensitivity: 0.2,
             bar_distribution: BarDistribution::Uniform,
         }
     }

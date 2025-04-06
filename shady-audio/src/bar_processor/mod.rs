@@ -3,7 +3,8 @@ mod config;
 use std::ops::Range;
 
 use config::BarDistribution;
-pub use config::{Config, InterpolationVariant, Sensitivity};
+pub use config::{BarProcessorConfig, InterpolationVariant};
+use easing_function::Easing;
 use realfft::num_complex::Complex32;
 use tracing::debug;
 
@@ -22,15 +23,20 @@ pub struct BarProcessor {
     supporting_point_fft_ranges: Box<[Range<usize>]>,
     interpolator: Box<dyn Interpolater>,
 
-    config: Config,
+    config: BarProcessorConfig,
+    easer: Box<dyn Easing>,
 }
 
 impl BarProcessor {
     /// Creates a new instance.
     ///
     /// See the examples of this crate to see it's usage.
-    pub fn new(processor: &SampleProcessor, config: Config) -> Self {
-        let Config {
+    pub fn new(
+        processor: &SampleProcessor,
+        easer: Box<dyn Easing>,
+        config: BarProcessorConfig,
+    ) -> Self {
+        let BarProcessorConfig {
             interpolation,
             amount_bars,
             freq_range,
@@ -115,6 +121,7 @@ impl BarProcessor {
             supporting_point_fft_ranges,
             interpolator,
             config,
+            easer,
         }
     }
 
@@ -133,13 +140,6 @@ impl BarProcessor {
     fn update_supporting_points(&mut self, fft_out: &[Complex32]) -> (bool, bool) {
         let mut overshoot = false;
         let mut is_silent = true;
-
-        let ease_bar = |x: f32| {
-            debug_assert!(0. <= x);
-            debug_assert!(x <= 1.);
-
-            (x + 1.).log10() * self.config.sensitivity.max + self.config.sensitivity.min
-        };
 
         for (supporting_point, fft_range) in self
             .interpolator
@@ -175,7 +175,8 @@ impl BarProcessor {
                 supporting_point.y *= 0.75;
             } else {
                 let diff = next_magnitude - prev_magnitude;
-                supporting_point.y += diff * ease_bar(diff.abs().min(1.0));
+                supporting_point.y +=
+                    diff * self.easer.ease(diff.abs().min(1.0)) * self.config.sensitivity;
             }
 
             if supporting_point.y > 1. {
@@ -187,7 +188,7 @@ impl BarProcessor {
     }
 
     /// Returns its config.
-    pub fn config(&self) -> &Config {
+    pub fn config(&self) -> &BarProcessorConfig {
         &self.config
     }
 }

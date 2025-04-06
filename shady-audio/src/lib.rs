@@ -12,11 +12,15 @@
 //! ## Simple workflow
 //! A simple workflow can look like this:
 //! ```
-//! use shady_audio::{SampleProcessor, BarProcessor, Config, fetcher::DummyFetcher};
+//! use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
 //!
 //! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
 //! // Note: The bar procesor is intended to only work with the given sample processor.
-//! let mut bar_processor = BarProcessor::new(&sample_processor, Config::default());
+//! let mut bar_processor = BarProcessor::new(
+//!     &sample_processor,
+//!     Box::new(shady_audio::easing_function::easings::EaseInBack),
+//!     BarProcessorConfig::default()
+//! );
 //!
 //! loop {
 //!     // let the sample processor process the next batch of samples
@@ -35,18 +39,26 @@
 //!
 //! ```
 //! use std::num::NonZero;
-//! use shady_audio::{SampleProcessor, BarProcessor, Config, fetcher::DummyFetcher};
+//! use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
 //!
 //! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
 //!
-//! let mut bar_processor = BarProcessor::new(&sample_processor, Config {
-//!   amount_bars: NonZero::new(20).unwrap(),
-//!   ..Default::default()
-//! });
-//! let mut bar_processor2 = BarProcessor::new(&sample_processor, Config {
-//!   amount_bars: NonZero::new(10).unwrap(),
-//!   ..Default::default()
-//! });
+//! let mut bar_processor = BarProcessor::new(
+//!     &sample_processor,
+//!     Box::new(shady_audio::easing_function::easings::EaseInOutBack),
+//!     BarProcessorConfig {
+//!         amount_bars: NonZero::new(20).unwrap(),
+//!         ..Default::default()
+//!     }
+//! );
+//! let mut bar_processor2 = BarProcessor::new(
+//!     &sample_processor,
+//!     Box::new(shady_audio::easing_function::easings::EaseInOutBack),
+//!     BarProcessorConfig {
+//!         amount_bars: NonZero::new(10).unwrap(),
+//!         ..Default::default()
+//!     }
+//! );
 //!
 //! loop {
 //!     // the sample processor needs to compute the new samples only once
@@ -68,21 +80,29 @@
 //! of bars it should output.
 //! ```
 //! use std::num::NonZero;
-//! use shady_audio::{SampleProcessor, BarProcessor, Config, fetcher::DummyFetcher};
+//! use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
 //!
 //! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
-//! let mut bar_processor = BarProcessor::new(&sample_processor, Config {
-//!     amount_bars: NonZero::new(20).unwrap(),
+//! let mut bar_processor = BarProcessor::new(
+//!     &sample_processor,
+//!     Box::new(shady_audio::easing_function::easings::EaseInOutSine),
+//!     BarProcessorConfig {
+//!         amount_bars: NonZero::new(20).unwrap(),
 //!     ..Default::default()
-//! });
+//!     }
+//! );
 //!
 //! assert_eq!(bar_processor.process_bars(&sample_processor).len(), 20);
 //!
 //! // change the amount of bars
-//! bar_processor = BarProcessor::new(&sample_processor, Config {
-//!    amount_bars: NonZero::new(10).unwrap(),
-//!    ..bar_processor.config().clone()
-//! });
+//! bar_processor = BarProcessor::new(
+//!     &sample_processor,
+//!     Box::new(shady_audio::easing_function::easings::EaseInOutSine),
+//!     BarProcessorConfig {
+//!         amount_bars: NonZero::new(10).unwrap(),
+//!        ..bar_processor.config().clone()
+//!     }
+//! );
 //!
 //! assert_eq!(bar_processor.process_bars(&sample_processor).len(), 10);
 //! ```
@@ -92,8 +112,9 @@ mod bar_processor;
 mod interpolation;
 mod sample_processor;
 
-pub use bar_processor::{BarProcessor, Config, InterpolationVariant, Sensitivity};
+pub use bar_processor::{BarProcessor, BarProcessorConfig, InterpolationVariant};
 pub use cpal;
+pub use easing_function;
 pub use sample_processor::SampleProcessor;
 
 use cpal::SampleRate;
