@@ -205,7 +205,7 @@ impl Shady {
         &mut self,
         device: &Device,
         sample_processor: &shady_audio::SampleProcessor,
-        amount_bars: std::num::NonZeroUsize,
+        amount_bars: std::num::NonZero<u16>,
     ) {
         self.resources
             .audio

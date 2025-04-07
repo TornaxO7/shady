@@ -8,7 +8,8 @@ use ratatui::{
     Frame,
 };
 use shady_audio::{
-    fetcher::SystemAudioFetcher, BarProcessor, Config, InterpolationVariant, SampleProcessor,
+    fetcher::SystemAudioFetcher, BarProcessor, BarProcessorConfig, InterpolationVariant,
+    SampleProcessor,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -47,7 +48,7 @@ impl<'a> Ctx<'a> {
 
         self.bar_processor = BarProcessor::new(
             &self.sample_processor,
-            Config {
+            BarProcessorConfig {
                 amount_bars,
                 ..self.bar_processor.config().clone()
             },
@@ -74,7 +75,7 @@ impl<'a> Ctx<'a> {
 
         self.bar_processor = BarProcessor::new(
             &self.sample_processor,
-            Config {
+            BarProcessorConfig {
                 interpolation: self.interpolation,
                 ..self.bar_processor.config().clone()
             },
@@ -89,7 +90,7 @@ fn main() -> std::io::Result<()> {
     let mut ctx = {
         let sample_processor =
             SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
-        let bar_processor = BarProcessor::new(&sample_processor, Config::default());
+        let bar_processor = BarProcessor::new(&sample_processor, BarProcessorConfig::default());
         Ctx {
             bar_width: 3,
             bars: Vec::new(),

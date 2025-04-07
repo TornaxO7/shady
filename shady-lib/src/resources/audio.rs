@@ -1,10 +1,6 @@
-use std::{
-    fmt,
-    num::{NonZeroU16, NonZeroUsize},
-    ops::Range,
-};
+use std::{fmt, num::NonZero, ops::Range};
 
-use shady_audio::{BarProcessor, Config, SampleProcessor};
+use shady_audio::{BarProcessor, BarProcessorConfig, SampleProcessor};
 use wgpu::Device;
 
 use crate::{template::TemplateGenerator, ShadyDescriptor};
@@ -34,32 +30,32 @@ impl Audio {
         &mut self,
         device: &Device,
         sample_processor: &SampleProcessor,
-        amount_bars: NonZeroUsize,
+        amount_bars: NonZero<u16>,
     ) {
         self.bar_processor = BarProcessor::new(
             sample_processor,
-            Config {
+            BarProcessorConfig {
                 amount_bars,
                 ..self.bar_processor.config().clone()
             },
         );
 
-        self.bar_values = vec![0.; usize::from(amount_bars)].into_boxed_slice();
+        self.bar_values = vec![0.; usize::from(u16::from(amount_bars))].into_boxed_slice();
 
         self.buffer = Self::create_storage_buffer(
             device,
-            (std::mem::size_of::<f32>() * usize::from(amount_bars)) as u64,
+            (std::mem::size_of::<f32>() * usize::from(u16::from(amount_bars))) as u64,
         );
     }
 
     pub fn set_frequency_range(
         &mut self,
         sample_processor: &SampleProcessor,
-        freq_range: Range<NonZeroU16>,
+        freq_range: Range<NonZero<u16>>,
     ) {
         self.bar_processor = BarProcessor::new(
             sample_processor,
-            Config {
+            BarProcessorConfig {
                 freq_range,
                 ..self.bar_processor.config().clone()
             },
@@ -76,8 +72,8 @@ impl Resource for Audio {
 
         let bar_processor = BarProcessor::new(
             desc.sample_processor,
-            Config {
-                amount_bars: NonZeroUsize::new(DEFAULT_AMOUNT_BARS).unwrap(),
+            BarProcessorConfig {
+                amount_bars: NonZero::new(DEFAULT_AMOUNT_BARS as u16).unwrap(),
                 ..Default::default()
             },
         );
