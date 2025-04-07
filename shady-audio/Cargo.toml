@@ -17,4 +17,8 @@ thiserror.workspace = true
 
 apodize = "1"
 nalgebra = "0.33"
-easing-function = "0.1"
+easing-function = { version = "0.1" }
+
+[features]
+default = []
+serde = ["easing-function/serde"]

@@ -173,7 +173,7 @@ impl BarProcessor {
             } else {
                 let diff = next_magnitude - prev_magnitude;
                 supporting_point.y +=
-                    diff * self.easer.ease(diff.abs().min(1.0)) * self.config.max_sensitivity;
+                    diff * self.easer.ease(diff.abs().min(1.0)) * self.config.sensitivity;
             }
 
             if supporting_point.y > 1. {

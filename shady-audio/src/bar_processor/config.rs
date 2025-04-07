@@ -46,7 +46,7 @@ pub struct BarProcessorConfig {
 
     /// Control how fast the bars should adjust to their new height.
     /// Shouldu be within the range `[0, 1]`.
-    pub max_sensitivity: f32,
+    pub sensitivity: f32,
 
     /// Set the bar distribution.
     /// In general you needn't use another value than its default.
@@ -62,7 +62,7 @@ impl Default for BarProcessorConfig {
             interpolation: InterpolationVariant::CubicSpline,
             amount_bars: NonZero::new(30).unwrap(),
             freq_range: NonZero::new(50).unwrap()..NonZero::new(10_000).unwrap(),
-            max_sensitivity: 0.2,
+            sensitivity: 0.2,
             bar_distribution: BarDistribution::Uniform,
             easer: StandardEasing::OutCircular,
         }
