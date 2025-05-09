@@ -56,9 +56,9 @@ impl<'a> WindowState<'a> {
             let surface_format = surface_caps
                 .formats
                 .iter()
-                .find(|f| f.is_srgb())
+                .find(|f| !f.is_srgb())
                 .copied()
-                .unwrap_or(surface_caps.formats[0]);
+                .unwrap();
 
             let size = window.clone().inner_size();
 
