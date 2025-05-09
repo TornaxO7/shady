@@ -71,36 +71,6 @@
 //!     break;
 //! }
 //! ```
-//!
-//! ## Change config of bar processors
-//! You have to create a new [BarProcessor] if you want to change it's behaviour like the amount
-//! of bars it should output.
-//! ```
-//! use std::num::NonZero;
-//! use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
-//!
-//! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
-//! let mut bar_processor = BarProcessor::new(
-//!     &sample_processor,
-//!     BarProcessorConfig {
-//!         amount_bars: NonZero::new(20).unwrap(),
-//!     ..Default::default()
-//!     }
-//! );
-//!
-//! assert_eq!(bar_processor.process_bars(&sample_processor).len(), 20);
-//!
-//! // change the amount of bars
-//! bar_processor = BarProcessor::new(
-//!     &sample_processor,
-//!     BarProcessorConfig {
-//!         amount_bars: NonZero::new(10).unwrap(),
-//!        ..bar_processor.config().clone()
-//!     }
-//! );
-//!
-//! assert_eq!(bar_processor.process_bars(&sample_processor).len(), 10);
-//! ```
 pub mod fetcher;
 
 mod bar_processor;

@@ -1,9 +1,10 @@
 mod config;
 
-use std::ops::Range;
+use std::{num::NonZero, ops::Range};
 
 use config::BarDistribution;
 pub use config::{BarProcessorConfig, InterpolationVariant};
+use cpal::SampleRate;
 use easing_function::{Easing, EasingFunction};
 use realfft::num_complex::Complex32;
 use tracing::debug;
@@ -23,8 +24,10 @@ pub struct BarProcessor {
     supporting_point_fft_ranges: Box<[Range<usize>]>,
     interpolator: Box<dyn Interpolater>,
 
-    config: BarProcessorConfig,
     easer: EasingFunction,
+    config: BarProcessorConfig,
+    sample_rate: SampleRate,
+    sample_len: usize,
 }
 
 impl BarProcessor {
@@ -32,93 +35,21 @@ impl BarProcessor {
     ///
     /// See the examples of this crate to see it's usage.
     pub fn new(processor: &SampleProcessor, config: BarProcessorConfig) -> Self {
-        let BarProcessorConfig {
-            interpolation,
-            amount_bars,
-            freq_range,
-            easer,
-            ..
-        } = config.clone();
+        let sample_rate = processor.sample_rate();
+        let sample_len = processor.fft_size();
 
-        let (supporting_points, supporting_point_fft_ranges) = {
-            let sample_rate = processor.sample_rate();
-            let sample_len = processor.fft_size();
-
-            let mut supporting_points = Vec::new();
-            let mut supporting_point_fft_ranges = Vec::new();
-
-            // == preparations
-            let weights = (0..u16::from(amount_bars))
-                .map(|index| exp_fun((index + 1) as f32 / (u16::from(amount_bars) + 1) as f32))
-                .collect::<Vec<f32>>();
-            debug!("Weights: {:?}", weights);
-
-            let amount_bins = {
-                let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
-                debug!("Freq resolution: {}", freq_resolution);
-
-                // the relevant index range of the fft output which we should use for the bars
-                let bin_range = Range {
-                    start: ((u16::from(freq_range.start) as f32 / freq_resolution) as usize).max(1),
-                    end: (u16::from(freq_range.end) as f32 / freq_resolution).ceil() as usize,
-                };
-                debug!("Bin range: {:?}", bin_range);
-                bin_range.len()
-            };
-            debug!("Available bins: {}", amount_bins);
-
-            // == supporting points
-            let mut prev_fft_range = 0..0;
-            for (bar_idx, weight) in weights.iter().enumerate() {
-                let end =
-                    ((weight / MAX_HUMAN_FREQUENCY as f32) * amount_bins as f32).ceil() as usize;
-
-                let new_fft_range = prev_fft_range.end..end;
-                let is_supporting_point =
-                    new_fft_range != prev_fft_range && !new_fft_range.is_empty();
-                if is_supporting_point {
-                    supporting_points.push(SupportingPoint { x: bar_idx, y: 0. });
-
-                    supporting_point_fft_ranges.push(new_fft_range.clone());
-                }
-
-                prev_fft_range = new_fft_range;
-            }
-
-            // re-adjust the supporting points if needed
-            match config.bar_distribution {
-                BarDistribution::Uniform => {
-                    let step = u16::from(amount_bars) as f32 / supporting_points.len() as f32;
-                    let supporting_points_len = supporting_points.len();
-                    for (idx, supporting_point) in supporting_points
-                        [..supporting_points_len.saturating_sub(1)]
-                        .iter_mut()
-                        .enumerate()
-                    {
-                        supporting_point.x = (idx as f32 * step) as usize;
-                    }
-                }
-                BarDistribution::Natural => {}
-            }
-
-            (
-                supporting_points,
-                supporting_point_fft_ranges.into_boxed_slice(),
-            )
-        };
-
-        let interpolator: Box<dyn Interpolater> = match interpolation {
-            InterpolationVariant::None => NothingInterpolation::boxed(supporting_points),
-            InterpolationVariant::Linear => LinearInterpolation::boxed(supporting_points),
-            InterpolationVariant::CubicSpline => CubicSplineInterpolation::boxed(supporting_points),
-        };
+        let (interpolator, supporting_point_fft_ranges) =
+            Self::new_inner(&config, sample_rate, sample_len);
 
         Self {
             normalize_factor: 1.,
             supporting_point_fft_ranges,
             interpolator,
+
+            easer: EasingFunction::from(config.easer),
             config,
-            easer: EasingFunction::from(easer),
+            sample_rate,
+            sample_len,
         }
     }
 
@@ -184,9 +115,117 @@ impl BarProcessor {
         (overshoot, is_silent)
     }
 
-    /// Returns its config.
-    pub fn config(&self) -> &BarProcessorConfig {
-        &self.config
+    /// Change the amount of bars which should be returned.
+    ///
+    /// # Example
+    /// ```rust
+    /// use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
+    ///
+    /// let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
+    /// let mut bar_processor = BarProcessor::new(
+    ///     &sample_processor,
+    ///     BarProcessorConfig {
+    ///         amount_bars: std::num::NonZero::new(10).unwrap(),
+    ///         ..Default::default()
+    ///     }
+    /// );
+    /// sample_processor.process_next_samples();
+    ///
+    /// let bars = bar_processor.process_bars(&sample_processor);
+    /// assert_eq!(bars.len(), 10);
+    ///
+    /// // change the amount of bars
+    /// bar_processor.set_amount_bars(std::num::NonZero::new(20).unwrap());
+    /// let bars = bar_processor.process_bars(&sample_processor);
+    /// assert_eq!(bars.len(), 20);
+    /// ```
+    pub fn set_amount_bars(&mut self, amount_bars: NonZero<u16>) {
+        self.config.amount_bars = amount_bars;
+
+        let (interpolator, supporting_point_fft_ranges) =
+            Self::new_inner(&self.config, self.sample_rate, self.sample_len);
+
+        self.supporting_point_fft_ranges = supporting_point_fft_ranges;
+        self.interpolator = interpolator;
+    }
+
+    /// Calculates the indexes for the fft output on how to distribute them to each bar.
+    fn new_inner(
+        config: &BarProcessorConfig,
+        sample_rate: SampleRate,
+        sample_len: usize,
+    ) -> (Box<dyn Interpolater>, Box<[Range<usize>]>) {
+        // == preparations
+        let weights = (0..u16::from(config.amount_bars))
+            .map(|index| exp_fun((index + 1) as f32 / (u16::from(config.amount_bars) + 1) as f32))
+            .collect::<Vec<f32>>();
+        debug!("Weights: {:?}", weights);
+
+        let amount_bins = {
+            let freq_resolution = sample_rate.0 as f32 / sample_len as f32;
+            debug!("Freq resolution: {}", freq_resolution);
+
+            // the relevant index range of the fft output which we should use for the bars
+            let bin_range = Range {
+                start: ((u16::from(config.freq_range.start) as f32 / freq_resolution) as usize)
+                    .max(1),
+                end: (u16::from(config.freq_range.end) as f32 / freq_resolution).ceil() as usize,
+            };
+            debug!("Bin range: {:?}", bin_range);
+            bin_range.len()
+        };
+        debug!("Available bins: {}", amount_bins);
+
+        // == supporting points
+        let (supporting_points, supporting_point_fft_ranges) = {
+            let mut supporting_points = Vec::new();
+            let mut supporting_point_fft_ranges = Vec::new();
+
+            let mut prev_fft_range = 0..0;
+            for (bar_idx, weight) in weights.iter().enumerate() {
+                let end =
+                    ((weight / MAX_HUMAN_FREQUENCY as f32) * amount_bins as f32).ceil() as usize;
+
+                let new_fft_range = prev_fft_range.end..end;
+                let is_supporting_point =
+                    new_fft_range != prev_fft_range && !new_fft_range.is_empty();
+                if is_supporting_point {
+                    supporting_points.push(SupportingPoint { x: bar_idx, y: 0. });
+
+                    supporting_point_fft_ranges.push(new_fft_range.clone());
+                }
+
+                prev_fft_range = new_fft_range;
+            }
+
+            // re-adjust the supporting points if needed
+            match config.bar_distribution {
+                BarDistribution::Uniform => {
+                    let step =
+                        u16::from(config.amount_bars) as f32 / supporting_points.len() as f32;
+                    let supporting_points_len = supporting_points.len();
+                    for (idx, supporting_point) in supporting_points
+                        [..supporting_points_len.saturating_sub(1)]
+                        .iter_mut()
+                        .enumerate()
+                    {
+                        supporting_point.x = (idx as f32 * step) as usize;
+                    }
+                }
+                BarDistribution::Natural => {}
+            }
+
+            (supporting_points, supporting_point_fft_ranges)
+        };
+
+        // create the interpolator
+        let interpolator: Box<dyn Interpolater> = match config.interpolation {
+            InterpolationVariant::None => NothingInterpolation::boxed(supporting_points),
+            InterpolationVariant::Linear => LinearInterpolation::boxed(supporting_points),
+            InterpolationVariant::CubicSpline => CubicSplineInterpolation::boxed(supporting_points),
+        };
+
+        (interpolator, supporting_point_fft_ranges.into_boxed_slice())
     }
 }
 
