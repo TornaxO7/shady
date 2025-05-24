@@ -65,6 +65,10 @@ impl BarProcessor {
         self.interpolator.interpolate()
     }
 
+    pub fn config(&self) -> &BarProcessorConfig {
+        &self.config
+    }
+
     fn update_supporting_points(&mut self, fft_out: &[Complex32]) -> (bool, bool) {
         let mut overshoot = false;
         let mut is_silent = true;

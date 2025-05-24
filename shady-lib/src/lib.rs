@@ -201,15 +201,8 @@ impl Shady {
     /// `iAudio`
     #[inline]
     #[cfg(feature = "audio")]
-    pub fn set_audio_bars(
-        &mut self,
-        device: &Device,
-        sample_processor: &shady_audio::SampleProcessor,
-        amount_bars: std::num::NonZero<u16>,
-    ) {
-        self.resources
-            .audio
-            .set_bars(device, sample_processor, amount_bars);
+    pub fn set_audio_bars(&mut self, device: &Device, amount_bars: std::num::NonZero<u16>) {
+        self.resources.audio.set_bars(device, amount_bars);
         // audio buffer will change => needs to be rebinded
         self.bind_group = self.resources.bind_group(device);
     }

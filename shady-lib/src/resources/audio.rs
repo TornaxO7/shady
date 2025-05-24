@@ -26,21 +26,9 @@ impl Audio {
         self.bar_values.copy_from_slice(bars);
     }
 
-    pub fn set_bars(
-        &mut self,
-        device: &Device,
-        sample_processor: &SampleProcessor,
-        amount_bars: NonZero<u16>,
-    ) {
-        self.bar_processor = BarProcessor::new(
-            sample_processor,
-            BarProcessorConfig {
-                amount_bars,
-                ..self.bar_processor.config().clone()
-            },
-        );
-
-        self.bar_values = vec![0.; usize::from(u16::from(amount_bars))].into_boxed_slice();
+    pub fn set_bars(&mut self, device: &Device, amount_bars: NonZero<u16>) {
+        self.bar_processor.set_amount_bars(amount_bars);
+        self.bar_values = vec![0.; usize::from(u16::from(amount_bars) - 8)].into_boxed_slice();
 
         self.buffer = Self::create_storage_buffer(
             device,

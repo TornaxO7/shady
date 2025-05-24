@@ -78,10 +78,16 @@ impl<'a> WindowState<'a> {
 
             let sample_processor =
                 SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
-            let shady = Shady::new(ShadyDescriptor {
+            let mut shady = Shady::new(ShadyDescriptor {
                 device: &device,
                 sample_processor: &sample_processor,
             });
+
+            shady.set_audio_frequency_range(
+                &sample_processor,
+                std::num::NonZero::new(50).unwrap()..std::num::NonZero::new(5000).unwrap(),
+            );
+            shady.set_audio_bars(&device, std::num::NonZero::new(1920 * 2).unwrap());
 
             (config, shady, pipeline, sample_processor)
         };
