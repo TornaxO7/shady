@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    SampleFormat, SampleRate, StreamError, SupportedStreamConfigRange,
+    SampleRate, StreamError, SupportedStreamConfigRange,
 };
 use tracing::{debug, instrument};
 
@@ -53,11 +53,6 @@ pub enum SystemAudioError {
     #[error("Couldn't retrieve default output dev")]
     NoDefaultDevice,
 
-    /// [crate::fetcher::SystemAudioFetcher] requires the sample format to be `F32` but something
-    /// else was given from the audio source.
-    #[error("Expected sample format F32 but got {0} instead.")]
-    InvalidSampleFormat(SampleFormat),
-
     /// No default configuration could be found of the default output device.
     #[error("Couldn't retrieve default config of the output stream of the default device.")]
     NoDefaultOutputStreamConfig,
@@ -76,9 +71,6 @@ pub struct SystemAudio {
 impl SystemAudio {
     /// This exposes the API of [cpal] which you can use to use your own [cpal::Device] and [cpal::SupportedStreamConfigRange]
     /// if you want.
-    ///
-    /// # Note
-    /// It's required that the device supports `f32` as its sample format!
     #[instrument(name = "SystemAudio::new", skip_all)]
     pub fn new<E>(
         device: &cpal::Device,
@@ -88,11 +80,6 @@ impl SystemAudio {
     where
         E: FnMut(StreamError) + Send + 'static,
     {
-        let sample_format = stream_config_range.sample_format();
-        if sample_format != SampleFormat::F32 {
-            return Err(SystemAudioError::InvalidSampleFormat(sample_format));
-        }
-
         let stream_config = {
             let supported_stream_config = stream_config_range
                 .try_with_sample_rate(DEFAULT_SAMPLE_RATE)
@@ -199,7 +186,7 @@ fn default_output_config(device: &cpal::Device) -> Option<SupportedStreamConfigR
             "Could it be that you are running \"pure\" pulseaudio?\n",
             "Only ALSA and JACK are supported for audio processing :("
         ])
-        .filter(|entry| entry.channels() == 1 && entry.sample_format() == SampleFormat::F32)
+        .filter(|entry| entry.channels() == 1)
         .collect();
 
     matching_configs.sort_by(|a, b| a.cmp_default_heuristics(b));
