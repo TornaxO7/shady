@@ -54,8 +54,8 @@ pub enum SystemAudioError {
     NoDefaultDevice,
 
     /// No default configuration could be found of the default output device.
-    #[error("Couldn't retrieve default config of the output stream of the default device.")]
-    NoDefaultOutputStreamConfig,
+    #[error("Couldn't retrieve any config of the output stream of the default device.")]
+    NoAvailableOutputConfigs,
 }
 
 /// Fetcher for the system audio.
@@ -140,9 +140,7 @@ impl SystemAudio {
             return Err(SystemAudioError::NoDefaultDevice);
         };
 
-        let Some(default_stream_config) = default_output_config(&default_device) else {
-            return Err(SystemAudioError::NoDefaultOutputStreamConfig);
-        };
+        let default_stream_config = default_output_config(&default_device)?;
 
         Self::new(&default_device, &default_stream_config, error_callback)
     }
@@ -178,7 +176,9 @@ impl Fetcher for SystemAudio {
 }
 
 #[instrument(skip_all)]
-fn default_output_config(device: &cpal::Device) -> Option<SupportedStreamConfigRange> {
+fn default_output_config(
+    device: &cpal::Device,
+) -> Result<SupportedStreamConfigRange, SystemAudioError> {
     let mut matching_configs: Vec<_> = device
         .supported_output_configs()
         .expect(concat![
@@ -186,9 +186,11 @@ fn default_output_config(device: &cpal::Device) -> Option<SupportedStreamConfigR
             "Could it be that you are running \"pure\" pulseaudio?\n",
             "Only ALSA and JACK are supported for audio processing :("
         ])
-        .filter(|entry| entry.channels() == 1)
         .collect();
 
     matching_configs.sort_by(|a, b| a.cmp_default_heuristics(b));
-    matching_configs.into_iter().next()
+    matching_configs
+        .into_iter()
+        .next()
+        .ok_or(SystemAudioError::NoAvailableOutputConfigs)
 }
