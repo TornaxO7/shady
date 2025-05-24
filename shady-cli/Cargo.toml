@@ -13,7 +13,7 @@ crossterm = "0.29.0"
 ratatui = "0.29"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-shady-audio = { path = "../shady-audio", version = "14" }
+shady-audio = { path = "../shady-audio", version = "15" }
 
 tracing.workspace = true
 clap.workspace = true
