@@ -8,8 +8,9 @@ use ratatui::{
     Frame,
 };
 use shady_audio::{
-    fetcher::SystemAudioFetcher, BarProcessor, BarProcessorConfig, InterpolationVariant,
-    SampleProcessor,
+    fetcher::{SystemAudioFetcher, SystemAudioFetcherDescriptor},
+    util::DeviceType,
+    BarProcessor, BarProcessorConfig, InterpolationVariant, SampleProcessor,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -21,6 +22,15 @@ struct Cli {
     /// The bar color. For a full list of possible colors: https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html
     #[arg(short, long, default_value_t = Color::LightBlue)]
     color: Color,
+
+    /// If `shady-cli` should print all available output devices which you can
+    /// pass to `--output_device`
+    #[arg(long)]
+    pub show_output_devices: bool,
+
+    /// Choose the output device `shady-cli` should use. You can get a list of devices by invoking `shady-cli` with the `--show-output-devices` argument.
+    #[arg(long)]
+    pub output_device: Option<String>,
 }
 
 struct Ctx<'a> {
@@ -87,10 +97,40 @@ fn main() -> std::io::Result<()> {
     init_logger();
 
     let cli = Cli::parse();
+    if cli.show_output_devices {
+        print_available_output_devices();
+        println!("Choose one of them and add it to the cli as an argument.");
+        return Ok(());
+    }
+
     let mut ctx = {
-        let sample_processor =
-            SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+        let device = match cli.output_device {
+            Some(device_name) => {
+                match shady_audio::util::get_device(&device_name, DeviceType::Output)
+                    .expect("Host has output devices")
+                {
+                    Some(device) => device,
+                    None => {
+                        print_available_output_devices();
+                        panic!(
+                            "There isn't an output device called: \"{}\".\nChoose another one.",
+                            &device_name
+                        );
+                    }
+                }
+            }
+            None => shady_audio::util::get_default_device(DeviceType::Output)
+                .expect("Default output device exists"),
+        };
+
+        let descriptor = SystemAudioFetcherDescriptor {
+            device,
+            ..Default::default()
+        };
+
+        let sample_processor = SampleProcessor::new(SystemAudioFetcher::new(&descriptor).unwrap());
         let bar_processor = BarProcessor::new(&sample_processor, BarProcessorConfig::default());
+
         Ctx {
             bar_width: 3,
             bars: Vec::new(),
@@ -163,4 +203,11 @@ fn init_logger() {
         .with(fmt_layer)
         .with(EnvFilter::from_env(EnvFilter::DEFAULT_ENV))
         .init();
+}
+
+fn print_available_output_devices() {
+    let names = shady_audio::util::get_device_names(DeviceType::Output)
+        .expect("Host has audio output devices");
+
+    println!("======\nAvailable output devices:\n{:#?}", names);
 }

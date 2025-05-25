@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use pollster::FutureExt;
 use shady::{
-    shady_audio::{fetcher::SystemAudioFetcher, SampleProcessor},
+    shady_audio::{
+        fetcher::{SystemAudioFetcher, SystemAudioFetcherDescriptor},
+        SampleProcessor,
+    },
     Shady, ShadyDescriptor,
 };
 use tracing::instrument;
@@ -76,8 +79,9 @@ impl<'a> WindowState<'a> {
             let pipeline = shader_source
                 .map(|source| shady::create_render_pipeline(&device, source, &surface_format));
 
-            let sample_processor =
-                SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+            let sample_processor = SampleProcessor::new(
+                SystemAudioFetcher::new(&SystemAudioFetcherDescriptor::default()).unwrap(),
+            );
             let mut shady = Shady::new(ShadyDescriptor {
                 device: &device,
                 sample_processor: &sample_processor,

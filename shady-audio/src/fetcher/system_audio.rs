@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
-    SampleRate, StreamError, SupportedStreamConfigRange,
+    traits::{DeviceTrait, StreamTrait},
+    SampleRate, SupportedStreamConfigRange,
 };
 use tracing::{debug, instrument};
 
@@ -47,7 +47,7 @@ impl SampleBuffer {
 }
 
 /// Errors which can occur while creating [crate::fetcher::SystemAudioFetcher].
-#[derive(thiserror::Error, Debug, Clone, Copy)]
+#[derive(thiserror::Error, Debug)]
 pub enum SystemAudioError {
     /// No default audio device could be found to fetch from.
     #[error("Couldn't retrieve default output dev")]
@@ -56,6 +56,33 @@ pub enum SystemAudioError {
     /// No default configuration could be found of the default output device.
     #[error("Couldn't retrieve any config of the output stream of the default device.")]
     NoAvailableOutputConfigs,
+
+    #[error("Couldn't get supported output config of device: {0}")]
+    SupportedStreamConfigError(#[from] cpal::SupportedStreamConfigsError),
+
+    #[error("Couldn't build an audio stream:\n{0}")]
+    BuildOutputStreamError(#[from] cpal::BuildStreamError),
+}
+
+pub struct Descriptor {
+    pub device: cpal::Device,
+    pub sample_rate: cpal::SampleRate,
+    pub sample_format: Option<cpal::SampleFormat>,
+    pub amount_channels: Option<u16>,
+}
+
+impl Default for Descriptor {
+    fn default() -> Self {
+        let device = crate::util::get_default_device(crate::util::DeviceType::Output)
+            .expect("Default output device is set in the system");
+
+        Self {
+            device,
+            sample_rate: DEFAULT_SAMPLE_RATE,
+            sample_format: None,
+            amount_channels: None,
+        }
+    }
 }
 
 /// Fetcher for the system audio.
@@ -69,23 +96,38 @@ pub struct SystemAudio {
 }
 
 impl SystemAudio {
-    /// This exposes the API of [cpal] which you can use to use your own [cpal::Device] and [cpal::SupportedStreamConfigRange]
-    /// if you want.
-    #[instrument(name = "SystemAudio::new", skip_all)]
-    pub fn new<E>(
-        device: &cpal::Device,
-        stream_config_range: &SupportedStreamConfigRange,
-        error_callback: E,
-    ) -> Result<Box<Self>, SystemAudioError>
-    where
-        E: FnMut(StreamError) + Send + 'static,
-    {
+    pub fn new(desc: &Descriptor) -> Result<Box<Self>, SystemAudioError> {
+        let device = &desc.device;
         let stream_config = {
-            let supported_stream_config = stream_config_range
-                .try_with_sample_rate(DEFAULT_SAMPLE_RATE)
-                .unwrap_or(stream_config_range.with_max_sample_rate());
-            supported_stream_config.config()
+            let mut matching_configs: Vec<_> = desc
+                .device
+                .supported_output_configs()?
+                .filter(|conf| {
+                    let matching_sample_format = desc
+                        .sample_format
+                        .map(|sample_format| sample_format == conf.sample_format())
+                        .unwrap_or(true);
+                    let matching_amount_channels = desc
+                        .amount_channels
+                        .map(|amount| amount == conf.channels())
+                        .unwrap_or(true);
+
+                    matching_sample_format && matching_amount_channels
+                })
+                .collect();
+
+            matching_configs.sort_by(|a, b| a.cmp_default_heuristics(b));
+            let supported_stream_config = matching_configs
+                .into_iter()
+                .next()
+                .ok_or(SystemAudioError::NoAvailableOutputConfigs)?;
+
+            supported_stream_config
+                .try_with_sample_rate(desc.sample_rate)
+                .unwrap_or(supported_stream_config.with_max_sample_rate())
+                .config()
         };
+
         let sample_rate = stream_config.sample_rate;
 
         debug!("Stream config: {:?}", stream_config);
@@ -97,20 +139,18 @@ impl SystemAudio {
         };
 
         let stream = {
-            let stream = device
-                .build_input_stream(
-                    &stream_config,
-                    {
-                        let buffer = sample_buffer.clone();
-                        move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                            let mut buf = buffer.lock().unwrap();
-                            buf.push_before(data);
-                        }
-                    },
-                    error_callback,
-                    None,
-                )
-                .expect("Start audio listening");
+            let stream = device.build_input_stream(
+                &stream_config,
+                {
+                    let buffer = sample_buffer.clone();
+                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                        let mut buf = buffer.lock().unwrap();
+                        buf.push_before(data);
+                    }
+                },
+                |err| panic!("`shady-audio`: {}", err),
+                None,
+            )?;
             stream.play().expect("Start listening to audio");
 
             stream
@@ -121,28 +161,6 @@ impl SystemAudio {
             sample_buffer,
             sample_rate,
         }))
-    }
-
-    /// Equals `SystemAudio::new(None, None, error_fallback)`.
-    ///
-    /// Let's `ShadyAudio` pick up the device and config.
-    ///
-    /// This is the recommended function to create an instance of this struct.
-    ///
-    /// # Args
-    /// - `error_callback` will be passed to the
-    ///   `error_callback` of [`cpal::traits::DeviceTrait::build_input_stream`].
-    pub fn default<E>(error_callback: E) -> Result<Box<Self>, SystemAudioError>
-    where
-        E: FnMut(StreamError) + Send + 'static,
-    {
-        let Some(default_device) = cpal::default_host().default_output_device() else {
-            return Err(SystemAudioError::NoDefaultDevice);
-        };
-
-        let default_stream_config = default_output_config(&default_device)?;
-
-        Self::new(&default_device, &default_stream_config, error_callback)
     }
 }
 

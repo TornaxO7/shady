@@ -6,7 +6,9 @@ mod system_audio;
 use cpal::SampleRate;
 
 pub use dummy::DummyFetcher;
-pub use system_audio::{SystemAudio as SystemAudioFetcher, SystemAudioError};
+pub use system_audio::{
+    Descriptor as SystemAudioFetcherDescriptor, SystemAudio as SystemAudioFetcher, SystemAudioError,
+};
 
 /// Interface for all structs (fetchers) which are listed in the [fetcher module](crate::fetcher).
 pub trait Fetcher {
