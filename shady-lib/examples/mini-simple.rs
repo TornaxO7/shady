@@ -3,7 +3,10 @@ use std::{borrow::Cow, sync::Arc};
 
 use pollster::FutureExt;
 use shady::{Shady, ShadyDescriptor, ShadyRenderPipeline};
-use shady_audio::{fetcher::SystemAudioFetcher, SampleProcessor};
+use shady_audio::{
+    fetcher::{SystemAudioFetcher, SystemAudioFetcherDescriptor},
+    SampleProcessor,
+};
 use wgpu::{
     Backends, Device, Instance, Queue, ShaderSource, Surface, SurfaceConfiguration,
     TextureViewDescriptor,
@@ -94,8 +97,9 @@ impl<'a> State<'a> {
         };
 
         // SHADY
-        let sample_processor =
-            SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+        let sample_processor = SampleProcessor::new(
+            SystemAudioFetcher::new(&SystemAudioFetcherDescriptor::default()).unwrap(),
+        );
         // SHADY
         let shady = Shady::new(ShadyDescriptor {
             device: &device,

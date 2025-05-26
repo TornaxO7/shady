@@ -1,7 +1,10 @@
 use image::{ImageBuffer, Rgba};
 use pollster::FutureExt;
 use shady::{
-    shady_audio::{fetcher::SystemAudioFetcher, SampleProcessor},
+    shady_audio::{
+        fetcher::{SystemAudioFetcher, SystemAudioFetcherDescriptor},
+        SampleProcessor,
+    },
     Shady, ShadyDescriptor, ShadyRenderPipeline,
 };
 use wgpu::{
@@ -108,8 +111,9 @@ impl TextureState {
         let pipeline = shader_source
             .map(|source| shady::create_render_pipeline(&device, source, &texture_format));
 
-        let sample_processor =
-            SampleProcessor::new(SystemAudioFetcher::default(|err| panic!("{}", err)).unwrap());
+        let sample_processor = SampleProcessor::new(
+            SystemAudioFetcher::new(&SystemAudioFetcherDescriptor::default()).unwrap(),
+        );
         let shady = Shady::new(ShadyDescriptor {
             device: &device,
             sample_processor: &sample_processor,

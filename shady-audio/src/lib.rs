@@ -72,6 +72,7 @@
 //! }
 //! ```
 pub mod fetcher;
+pub mod util;
 
 mod bar_processor;
 mod interpolation;
