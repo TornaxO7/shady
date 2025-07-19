@@ -5,7 +5,6 @@ use std::{num::NonZero, ops::Range};
 use config::BarDistribution;
 pub use config::{BarProcessorConfig, InterpolationVariant};
 use cpal::SampleRate;
-use easing_function::{Easing, EasingFunction};
 use realfft::num_complex::Complex32;
 use tracing::debug;
 
@@ -17,151 +16,54 @@ use crate::{
     SampleProcessor, MAX_HUMAN_FREQUENCY, MIN_HUMAN_FREQUENCY,
 };
 
-/// The struct which computates the bar values of the samples of the fetcher.
-pub struct BarProcessor {
-    normalize_factor: f32,
+type ChannelInterpolator = InterpolatorCtx;
+type ChannelBars = Box<[f32]>;
 
-    supporting_point_fft_ranges: Box<[Range<usize>]>,
+struct InterpolatorCtx {
     interpolator: Box<dyn Interpolater>,
+    supporting_point_fft_ranges: Box<[Range<usize>]>,
 
-    easer: EasingFunction,
-    config: BarProcessorConfig,
-    sample_rate: SampleRate,
-    sample_len: usize,
+    normalize_factor: f32,
+    sensitivity: f32,
+
+    prev: Box<[f32]>,
+    peak: Box<[f32]>,
+    fall: Box<[f32]>,
+    mem: Box<[f32]>,
 }
 
-impl BarProcessor {
-    /// Creates a new instance.
-    ///
-    /// See the examples of this crate to see it's usage.
-    pub fn new(processor: &SampleProcessor, config: BarProcessorConfig) -> Self {
-        let sample_rate = processor.sample_rate();
-        let sample_len = processor.fft_size();
-
+impl InterpolatorCtx {
+    fn new(config: &BarProcessorConfig, sample_rate: SampleRate, fft_size: usize) -> Self {
         let (interpolator, supporting_point_fft_ranges) =
-            Self::new_inner(&config, sample_rate, sample_len);
+            Self::new_interpolation_data(config, sample_rate, fft_size);
+
+        let peak = vec![0f32; u16::from(config.amount_bars) as usize].into_boxed_slice();
+        let fall = peak.clone();
+        let mem = peak.clone();
+        let prev = peak.clone();
 
         Self {
-            normalize_factor: 1.,
-            supporting_point_fft_ranges,
             interpolator,
+            supporting_point_fft_ranges,
+            normalize_factor: 1.,
+            sensitivity: config.sensitivity,
 
-            easer: EasingFunction::from(config.easer),
-            config,
-            sample_rate,
-            sample_len,
+            prev,
+            peak,
+            fall,
+            mem,
         }
-    }
-
-    /// Returns the values for each bar.
-    pub fn process_bars(&mut self, processor: &SampleProcessor) -> &[f32] {
-        let (overshoot, is_silent) = self.update_supporting_points(processor.fft_out());
-        if overshoot {
-            self.normalize_factor *= 0.98;
-        } else if !is_silent {
-            self.normalize_factor *= 1.002;
-        }
-
-        self.interpolator.interpolate()
-    }
-
-    pub fn config(&self) -> &BarProcessorConfig {
-        &self.config
-    }
-
-    fn update_supporting_points(&mut self, fft_out: &[Complex32]) -> (bool, bool) {
-        let mut overshoot = false;
-        let mut is_silent = true;
-
-        for (supporting_point, fft_range) in self
-            .interpolator
-            .supporting_points_mut()
-            .zip(self.supporting_point_fft_ranges.iter_mut())
-        {
-            let x = supporting_point.x;
-            let prev_magnitude = supporting_point.y;
-            let next_magnitude = {
-                let mut raw_bar_val = fft_out[fft_range.clone()]
-                    .iter()
-                    .map(|out| {
-                        let mag = out.norm_sqr();
-                        if mag > 0. {
-                            is_silent = false;
-                        }
-                        mag
-                    })
-                    .max_by(|a, b| a.total_cmp(b))
-                    .unwrap();
-
-                raw_bar_val = raw_bar_val.sqrt();
-
-                self.normalize_factor
-                    * raw_bar_val
-                    * 10f32.powf((x as f32 / u16::from(self.config.amount_bars) as f32) - 1.1)
-            };
-
-            debug_assert!(!prev_magnitude.is_nan());
-            debug_assert!(!next_magnitude.is_nan());
-
-            if is_silent {
-                supporting_point.y *= 0.75;
-            } else {
-                let diff = next_magnitude - prev_magnitude;
-                supporting_point.y +=
-                    diff * self.easer.ease(diff.abs().min(1.0)) * self.config.sensitivity;
-            }
-
-            if supporting_point.y > 1. {
-                overshoot = true;
-            }
-        }
-
-        (overshoot, is_silent)
-    }
-
-    /// Change the amount of bars which should be returned.
-    ///
-    /// # Example
-    /// ```rust
-    /// use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
-    ///
-    /// let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
-    /// let mut bar_processor = BarProcessor::new(
-    ///     &sample_processor,
-    ///     BarProcessorConfig {
-    ///         amount_bars: std::num::NonZero::new(10).unwrap(),
-    ///         ..Default::default()
-    ///     }
-    /// );
-    /// sample_processor.process_next_samples();
-    ///
-    /// let bars = bar_processor.process_bars(&sample_processor);
-    /// assert_eq!(bars.len(), 10);
-    ///
-    /// // change the amount of bars
-    /// bar_processor.set_amount_bars(std::num::NonZero::new(20).unwrap());
-    /// let bars = bar_processor.process_bars(&sample_processor);
-    /// assert_eq!(bars.len(), 20);
-    /// ```
-    pub fn set_amount_bars(&mut self, amount_bars: NonZero<u16>) {
-        self.config.amount_bars = amount_bars;
-
-        let (interpolator, supporting_point_fft_ranges) =
-            Self::new_inner(&self.config, self.sample_rate, self.sample_len);
-
-        self.supporting_point_fft_ranges = supporting_point_fft_ranges;
-        self.interpolator = interpolator;
     }
 
     /// Calculates the indexes for the fft output on how to distribute them to each bar.
-    fn new_inner(
+    fn new_interpolation_data(
         config: &BarProcessorConfig,
         sample_rate: SampleRate,
         sample_len: usize,
     ) -> (Box<dyn Interpolater>, Box<[Range<usize>]>) {
         // == preparations
-        let weights = (0..u16::from(config.amount_bars))
-            .map(|index| exp_fun((index + 1) as f32 / (u16::from(config.amount_bars) + 1) as f32))
+        let weights = (0..config.amount_bars.get())
+            .map(|index| exp_fun((index + 1) as f32 / (config.amount_bars.get() + 1) as f32))
             .collect::<Vec<f32>>();
         debug!("Weights: {:?}", weights);
 
@@ -205,8 +107,7 @@ impl BarProcessor {
             // re-adjust the supporting points if needed
             match config.bar_distribution {
                 BarDistribution::Uniform => {
-                    let step =
-                        u16::from(config.amount_bars) as f32 / supporting_points.len() as f32;
+                    let step = config.amount_bars.get() as f32 / supporting_points.len() as f32;
                     let supporting_points_len = supporting_points.len();
                     for (idx, supporting_point) in supporting_points
                         [..supporting_points_len.saturating_sub(1)]
@@ -230,6 +131,196 @@ impl BarProcessor {
         };
 
         (interpolator, supporting_point_fft_ranges.into_boxed_slice())
+    }
+
+    fn update_supporting_points(&mut self, fft_out: &[Complex32]) {
+        let mut overshoot = false;
+        let mut is_silent = true;
+
+        let amount_bars = self.amount_bars();
+
+        for (bar_idx, (supporting_point, fft_range)) in self
+            .interpolator
+            .supporting_points_mut()
+            .zip(self.supporting_point_fft_ranges.iter_mut())
+            .enumerate()
+        {
+            let x = supporting_point.x;
+            let prev_magnitude = supporting_point.y;
+            let mut next_magnitude = {
+                let mut raw_bar_val = fft_out[fft_range.clone()]
+                    .iter()
+                    .map(|out| {
+                        let mag = out.norm_sqr();
+                        if mag > 0. {
+                            is_silent = false;
+                        }
+                        mag
+                    })
+                    .max_by(|a, b| a.total_cmp(b))
+                    .unwrap();
+
+                raw_bar_val = raw_bar_val.sqrt();
+
+                raw_bar_val
+                    * self.normalize_factor
+                    * 10f32.powf((x as f32 / amount_bars as f32) - 1.)
+            };
+
+            debug_assert!(!prev_magnitude.is_nan());
+            debug_assert!(!next_magnitude.is_nan());
+
+            // shoutout to `cava` for their computation on how to make the falling look smooth.
+            if next_magnitude < self.prev[bar_idx] {
+                let grav_mod = 1f32.powf(2.5) * 1.54 / self.sensitivity;
+                next_magnitude = self.peak[bar_idx]
+                    * (1. - (self.fall[bar_idx] * self.fall[bar_idx] * grav_mod));
+
+                if next_magnitude < 0. {
+                    next_magnitude = 0.;
+                }
+                self.fall[bar_idx] += 0.028;
+            } else {
+                self.peak[bar_idx] = next_magnitude;
+                self.fall[bar_idx] = 0.0;
+            }
+            self.prev[bar_idx] = next_magnitude;
+
+            supporting_point.y = self.mem[bar_idx] * 0.77 + next_magnitude;
+            self.mem[bar_idx] = supporting_point.y;
+
+            if supporting_point.y > 1. {
+                overshoot = true;
+            }
+        }
+
+        if overshoot {
+            self.normalize_factor *= 0.98;
+        } else if !is_silent {
+            self.normalize_factor *= 1.002;
+        }
+    }
+
+    fn amount_bars(&self) -> usize {
+        self.prev.len()
+    }
+}
+
+/// The struct which computates the bar values of the samples of the fetcher.
+pub struct BarProcessor {
+    bar_values: Box<[Box<[f32]>]>,
+    channels: Box<[InterpolatorCtx]>,
+
+    config: BarProcessorConfig,
+    sample_rate: SampleRate,
+    sample_len: usize,
+}
+
+impl BarProcessor {
+    /// Creates a new instance.
+    ///
+    /// See the examples of this crate to see it's usage.
+    pub fn new(processor: &SampleProcessor, config: BarProcessorConfig) -> Self {
+        let sample_rate = processor.sample_rate();
+        let sample_len = processor.fft_size();
+        let amount_channels = processor.amount_channels();
+
+        let (channels, bar_values) =
+            Self::get_channels_and_bar_values(&config, amount_channels, sample_rate, sample_len);
+
+        Self {
+            config,
+            channels,
+            bar_values,
+
+            sample_rate,
+            sample_len,
+        }
+    }
+
+    /// Returns the bar values for each channel.
+    ///
+    /// If you access the returned value like this: `bar_processor.process_bars(&processor)[i][j]` then this would mean:
+    /// You are accessing the `j`th bar value of the `i`th audio channel.
+    pub fn process_bars(&mut self, processor: &SampleProcessor) -> &[Box<[f32]>] {
+        for ((channel_idx, channel), fft_ctx) in self
+            .channels
+            .iter_mut()
+            .enumerate()
+            .zip(processor.fft_out().iter())
+        {
+            channel.update_supporting_points(&fft_ctx.fft_out);
+
+            channel
+                .interpolator
+                .interpolate(&mut self.bar_values[channel_idx]);
+        }
+
+        &self.bar_values
+    }
+
+    pub fn config(&self) -> &BarProcessorConfig {
+        &self.config
+    }
+
+    /// Change the amount of bars which should be returned.
+    ///
+    /// # Example
+    /// ```rust
+    /// use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
+    ///
+    /// let mut sample_processor = SampleProcessor::new(DummyFetcher::new(1));
+    /// let mut bar_processor = BarProcessor::new(
+    ///     &sample_processor,
+    ///     BarProcessorConfig {
+    ///         amount_bars: std::num::NonZero::new(10).unwrap(),
+    ///         ..Default::default()
+    ///     }
+    /// );
+    /// sample_processor.process_next_samples();
+    ///
+    /// let bars = bar_processor.process_bars(&sample_processor);
+    /// // the dummy just has one channel
+    /// assert_eq!(bars.len(), 1);
+    /// // but it should have ten bars
+    /// assert_eq!(bars[0].len(), 10);
+    ///
+    /// // change the amount of bars
+    /// bar_processor.set_amount_bars(std::num::NonZero::new(20).unwrap());
+    /// let bars = bar_processor.process_bars(&sample_processor);
+    /// assert_eq!(bars.len(), 1);
+    /// assert_eq!(bars[0].len(), 20);
+    /// ```
+    pub fn set_amount_bars(&mut self, amount_bars: NonZero<u16>) {
+        self.config.amount_bars = amount_bars;
+        let amount_channels = self.channels.len();
+
+        let (channels, bar_values) = Self::get_channels_and_bar_values(
+            &self.config,
+            amount_channels,
+            self.sample_rate,
+            self.sample_len,
+        );
+
+        self.channels = channels;
+        self.bar_values = bar_values;
+    }
+
+    fn get_channels_and_bar_values(
+        config: &BarProcessorConfig,
+        amount_channels: usize,
+        sample_rate: SampleRate,
+        sample_len: usize,
+    ) -> (Box<[ChannelInterpolator]>, Box<[ChannelBars]>) {
+        let mut channels = Vec::with_capacity(amount_channels);
+        let bar_values =
+            vec![vec![0f32; config.amount_bars.get() as usize].into_boxed_slice(); amount_channels];
+
+        for _ in 0..amount_channels {
+            channels.push(InterpolatorCtx::new(config, sample_rate, sample_len));
+        }
+
+        (channels.into_boxed_slice(), bar_values.into_boxed_slice())
     }
 }
 

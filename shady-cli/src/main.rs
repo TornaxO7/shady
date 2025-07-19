@@ -37,6 +37,7 @@ struct Ctx<'a> {
     bar_width: u16,
     bars: Vec<Bar<'a>>,
     color: Color,
+    amount_channels: u16,
 
     sample_processor: SampleProcessor,
     bar_processor: BarProcessor,
@@ -52,14 +53,14 @@ impl<'a> Ctx<'a> {
         let amount_bars = self.amount_bars(columns);
 
         self.bars.resize(
-            usize::from(u16::from(amount_bars)),
+            amount_bars.get() as usize,
             Bar::default().text_value("".to_string()),
         );
 
         self.bar_processor = BarProcessor::new(
             &self.sample_processor,
             BarProcessorConfig {
-                amount_bars,
+                amount_bars: NonZero::new(amount_bars.get() / self.amount_channels).unwrap(),
                 ..self.bar_processor.config().clone()
             },
         );
@@ -69,8 +70,14 @@ impl<'a> Ctx<'a> {
         self.sample_processor.process_next_samples();
         let bar_values = self.bar_processor.process_bars(&self.sample_processor);
 
-        for (value, bar) in bar_values.iter().zip(self.bars.iter_mut()) {
-            *bar = bar.clone().value((HEIGHT as f32 * value) as u64);
+        let mut bar_idx = 0;
+        for channel_bars in bar_values {
+            for value in channel_bars.iter() {
+                self.bars[bar_idx] = self.bars[bar_idx]
+                    .clone()
+                    .value((HEIGHT as f32 * value) as u64);
+                bar_idx += 1;
+            }
         }
 
         self.bars.as_slice()
@@ -125,6 +132,7 @@ fn main() -> std::io::Result<()> {
 
         let descriptor = SystemAudioFetcherDescriptor {
             device,
+            amount_channels: Some(2),
             ..Default::default()
         };
 
@@ -133,6 +141,7 @@ fn main() -> std::io::Result<()> {
 
         Ctx {
             bar_width: 3,
+            amount_channels: 2,
             bars: Vec::new(),
             color: cli.color,
             sample_processor,

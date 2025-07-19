@@ -14,11 +14,15 @@
 //! ```
 //! use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
 //!
-//! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
+//! // A fetcher with 2 channels
+//! let mut sample_processor = SampleProcessor::new(DummyFetcher::new(2));
 //! // Note: The bar procesor is intended to only work with the given sample processor.
 //! let mut bar_processor = BarProcessor::new(
 //!     &sample_processor,
-//!     BarProcessorConfig::default()
+//!     BarProcessorConfig {
+//!         amount_bars: std::num::NonZero::new(30).unwrap(),
+//!         ..Default::default()
+//!     }
 //! );
 //!
 //! loop {
@@ -28,6 +32,12 @@
 //!     // let the bar processor convert the samples into "bar-values"
 //!     // which are tried to be set in the range of `[0, 1]`.
 //!     let bars = bar_processor.process_bars(&sample_processor);
+//!
+//!     // we have two channels, so there should be two arrays:
+//!     assert_eq!(bars.len(), 2);
+//!     // each channel has the same amount of bars as set in the config
+//!     assert_eq!(bars[0].len(), 30);
+//!     assert_eq!(bars[1].len(), 30);
 //!
 //!     break;
 //! }
@@ -40,7 +50,7 @@
 //! use std::num::NonZero;
 //! use shady_audio::{SampleProcessor, BarProcessor, BarProcessorConfig, fetcher::DummyFetcher};
 //!
-//! let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
+//! let mut sample_processor = SampleProcessor::new(DummyFetcher::new(2));
 //!
 //! let mut bar_processor = BarProcessor::new(
 //!     &sample_processor,
@@ -52,7 +62,7 @@
 //! let mut bar_processor2 = BarProcessor::new(
 //!     &sample_processor,
 //!     BarProcessorConfig {
-//!         amount_bars: NonZero::new(10).unwrap(),
+//!         amount_bars: NonZero::new(11).unwrap(),
 //!         ..Default::default()
 //!     }
 //! );
@@ -65,8 +75,17 @@
 //!     let bars = bar_processor.process_bars(&sample_processor);
 //!     let bars2 = bar_processor2.process_bars(&sample_processor);
 //!
-//!     assert_eq!(bars.len(), 20);
-//!     assert_eq!(bars2.len(), 10);
+//!     // the dummy fetcher has two channels, so each bar processor should return a 2D array
+//!     assert_eq!(bars.len(), 2);
+//!     assert_eq!(bars2.len(), 2);
+//!
+//!     // each channel has the same amount of bars as set in the config ...
+//!     assert_eq!(bars[0].len(), 20);
+//!     assert_eq!(bars[1].len(), 20);
+//!
+//!     // ... same here
+//!     assert_eq!(bars2[0].len(), 11);
+//!     assert_eq!(bars2[1].len(), 11);
 //!
 //!     break;
 //! }

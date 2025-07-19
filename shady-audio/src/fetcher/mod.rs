@@ -24,4 +24,7 @@ pub trait Fetcher {
 
     /// Returns the sample rate of the fetcher/audio source.
     fn sample_rate(&self) -> SampleRate;
+
+    /// Returns the amount of channels which are used from the fetcher.
+    fn channels(&self) -> u16;
 }

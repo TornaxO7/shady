@@ -12,7 +12,7 @@ pub use linear::LinearInterpolation;
 pub use nothing::NothingInterpolation;
 
 pub trait Interpolater {
-    fn interpolate(&mut self) -> &[f32];
+    fn interpolate(&mut self, buffer: &mut [f32]);
 
     fn supporting_points_mut(&mut self) -> IterMut<'_, SupportingPoint>;
 }

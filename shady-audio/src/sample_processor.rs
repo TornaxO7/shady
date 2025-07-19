@@ -8,10 +8,9 @@ pub struct SampleProcessor {
     planner: RealFftPlanner<f32>,
     hann_window: Box<[f32]>,
 
-    scratch_buffer: Box<[Complex32]>,
-    fft_out: Box<[Complex32]>,
-    fft_in: Box<[f32]>,
     fft_in_raw: Box<[f32]>,
+
+    channels: Box<[FftContext]>,
 
     fft_size: usize,
     fetcher: Box<dyn Fetcher>,
@@ -47,18 +46,17 @@ impl SampleProcessor {
             .collect::<Vec<f32>>()
             .into_boxed_slice();
 
-        let fft_in = vec![0.; fft_size].into_boxed_slice();
         let fft_in_raw = vec![0.; fft_size].into_boxed_slice();
-        let scratch_buffer = vec![Complex32::ZERO; fft_out_size].into_boxed_slice();
-        let fft_out = vec![Complex32::ZERO; fft_out_size].into_boxed_slice();
+
+        let channels = vec![FftContext::new(fft_size, fft_out_size); fetcher.channels() as usize]
+            .into_boxed_slice();
 
         Self {
             planner: RealFftPlanner::new(),
             hann_window,
-            scratch_buffer,
-            fft_out,
-            fft_in,
             fft_in_raw,
+
+            channels,
 
             fft_size,
             fetcher,
@@ -70,17 +68,22 @@ impl SampleProcessor {
     pub fn process_next_samples(&mut self) {
         self.fetcher.fetch_samples(&mut self.fft_in_raw);
 
-        for (i, &sample) in self.fft_in_raw.iter().enumerate() {
-            self.fft_in[i] = sample * self.hann_window[i];
+        let amount_channels = self.fetcher.channels() as usize;
+        for (sample_idx, samples) in self.fft_in_raw.chunks_exact(amount_channels).enumerate() {
+            for (channel_idx, channel) in self.channels.iter_mut().enumerate() {
+                channel.fft_in[sample_idx] = samples[channel_idx] * self.hann_window[sample_idx];
+            }
         }
 
         let fft = self.planner.plan_fft_forward(self.fft_size);
-        fft.process_with_scratch(
-            self.fft_in.as_mut(),
-            self.fft_out.as_mut(),
-            self.scratch_buffer.as_mut(),
-        )
-        .unwrap();
+        for channel in self.channels.iter_mut() {
+            fft.process_with_scratch(
+                channel.fft_in.as_mut(),
+                channel.fft_out.as_mut(),
+                channel.scratch_buffer.as_mut(),
+            )
+            .unwrap();
+        }
     }
 }
 
@@ -89,11 +92,36 @@ impl SampleProcessor {
         self.fft_size
     }
 
-    pub(crate) fn fft_out(&self) -> &[Complex32] {
-        &self.fft_out
+    pub(crate) fn fft_out(&self) -> &[FftContext] {
+        &self.channels
     }
 
     pub(crate) fn sample_rate(&self) -> SampleRate {
         self.fetcher.sample_rate()
+    }
+
+    pub(crate) fn amount_channels(&self) -> usize {
+        self.channels.len()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FftContext {
+    fft_in: Box<[f32]>,
+    pub fft_out: Box<[Complex32]>,
+    scratch_buffer: Box<[Complex32]>,
+}
+
+impl FftContext {
+    fn new(fft_size: usize, fft_out_size: usize) -> Self {
+        let fft_in = vec![0.; fft_size].into_boxed_slice();
+        let fft_out = vec![Complex32::ZERO; fft_out_size].into_boxed_slice();
+        let scratch_buffer = fft_out.clone();
+
+        Self {
+            fft_in,
+            fft_out,
+            scratch_buffer,
+        }
     }
 }

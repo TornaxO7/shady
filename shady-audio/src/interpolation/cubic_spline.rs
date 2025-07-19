@@ -55,13 +55,13 @@ impl InterpolationInner for CubicSplineInterpolation {
 }
 
 impl Interpolater for CubicSplineInterpolation {
-    fn interpolate(&mut self) -> &[f32] {
+    fn interpolate(&mut self, buffer: &mut [f32]) {
         for point in self.ctx.supporting_points.iter() {
-            self.ctx.bar_values[point.x] = point.y;
+            buffer[point.x] = point.y;
         }
 
         if self.ctx.supporting_points.len() < 2 {
-            return &self.ctx.bar_values;
+            return;
         }
 
         // == preparation ==
@@ -128,11 +128,9 @@ impl Interpolater for CubicSplineInterpolation {
                         * ((prev_gamma + 2. * next_gamma) * (x - left.x as f32)
                             - (2. * prev_gamma + next_gamma) * (x - right.x as f32));
 
-                self.ctx.bar_values[bar_idx] = interpolated_value;
+                buffer[bar_idx] = interpolated_value;
             }
         }
-
-        &self.ctx.bar_values
     }
 
     fn supporting_points_mut(&mut self) -> std::slice::IterMut<'_, super::SupportingPoint> {
@@ -186,15 +184,23 @@ mod tests {
     #[test]
     fn no_supporting_points() {
         let mut interpolator = CubicSplineInterpolation::new([]);
-        assert_eq!(interpolator.interpolate(), &[]);
+        let mut buffer = vec![];
+
+        interpolator.interpolate(&mut buffer);
+
+        assert_eq!(&buffer, &[]);
     }
 
     #[test]
     fn one_supporting_point() {
         let supporting_points = [SupportingPoint { x: 0, y: 1.0 }];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = CubicSplineInterpolation::new(supporting_points);
-        assert_eq!(interpolator.interpolate(), &[1.]);
+
+        interpolator.interpolate(&mut buffer);
+
+        assert_eq!(&buffer, &[1.]);
     }
 
     #[test]
@@ -204,8 +210,12 @@ mod tests {
             SupportingPoint { x: 5, y: 1.0 },
         ];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = CubicSplineInterpolation::new(supporting_points);
-        validate_interpolation(interpolator.interpolate());
+
+        interpolator.interpolate(&mut buffer);
+
+        validate_interpolation(&buffer);
     }
 
     #[test]
@@ -216,8 +226,12 @@ mod tests {
             SupportingPoint { x: 10, y: 1. },
         ];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = CubicSplineInterpolation::new(supporting_points);
-        validate_interpolation(interpolator.interpolate());
+
+        interpolator.interpolate(&mut buffer);
+
+        validate_interpolation(&buffer);
     }
 
     #[test]
@@ -230,8 +244,12 @@ mod tests {
             SupportingPoint { x: 20, y: 1. },
         ];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = CubicSplineInterpolation::new(supporting_points);
-        validate_interpolation(interpolator.interpolate());
+
+        interpolator.interpolate(&mut buffer);
+
+        validate_interpolation(&buffer);
     }
 
     mod matrix {

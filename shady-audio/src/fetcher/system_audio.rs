@@ -14,33 +14,31 @@ struct SampleBuffer {
     buffer: Box<[f32]>,
     length: usize,
     capacity: usize,
-    channels: u16,
 }
 
 impl SampleBuffer {
-    pub fn new(sample_rate: SampleRate, channels: u16) -> Self {
-        let capacity = sample_rate.0 as usize;
+    pub fn new(capacity: usize) -> Self {
         let buffer = vec![0.; capacity].into_boxed_slice();
 
         Self {
             buffer,
             capacity,
             length: 0,
-            channels,
         }
     }
 
+    /// Pushes the given data to the front of `buffer` and moves the current data to the right.
+    /// Basically a `VecDeque::push_before` just on a `Box<[f32]>`.
     pub fn push_before(&mut self, data: &[f32]) {
-        let data_len = data.len() / self.channels as usize;
+        let data_len = data.len();
         let new_len = std::cmp::min(self.capacity, self.length + data_len);
+        let len_new_data = new_len - self.length;
 
         // move the current values to the right
-        self.buffer
-            .copy_within(..self.length, new_len - self.length);
+        self.buffer.copy_within(..self.length, len_new_data);
 
-        for (i, values) in data.chunks_exact(self.channels as usize).enumerate() {
-            self.buffer[i] = values.iter().sum::<f32>() / self.channels as f32;
-        }
+        // write the new data into it
+        self.buffer[..len_new_data].copy_from_slice(&data[..len_new_data]);
 
         self.length = new_len;
     }
@@ -92,6 +90,8 @@ pub struct SystemAudio {
     sample_buffer: Arc<Mutex<SampleBuffer>>,
     sample_rate: SampleRate,
 
+    channels: u16,
+
     _stream: cpal::Stream,
 }
 
@@ -129,12 +129,12 @@ impl SystemAudio {
         };
 
         let sample_rate = stream_config.sample_rate;
+        let channels = stream_config.channels;
 
         debug!("Stream config: {:?}", stream_config);
 
         let sample_buffer = {
-            let channels = stream_config.channels;
-            let buffer = SampleBuffer::new(sample_rate, channels);
+            let buffer = SampleBuffer::new(sample_rate.0 as usize);
             Arc::new(Mutex::new(buffer))
         };
 
@@ -152,12 +152,12 @@ impl SystemAudio {
                 None,
             )?;
             stream.play().expect("Start listening to audio");
-
             stream
         };
 
         Ok(Box::new(Self {
             _stream: stream,
+            channels,
             sample_buffer,
             sample_rate,
         }))
@@ -178,6 +178,8 @@ impl Fetcher for SystemAudio {
         let buf_len = buf.len();
         let mut sample_buffer = self.sample_buffer.lock().unwrap();
 
+        tracing::debug!("{:?}", sample_buffer.buffer);
+
         let amount_samples = buf_len.min(sample_buffer.length);
         let new_sample_buffer_len = sample_buffer.length - amount_samples;
 
@@ -190,6 +192,10 @@ impl Fetcher for SystemAudio {
 
     fn sample_rate(&self) -> SampleRate {
         self.sample_rate
+    }
+
+    fn channels(&self) -> u16 {
+        self.channels
     }
 }
 
