@@ -14,12 +14,10 @@ impl InterpolationInner for NothingInterpolation {
 }
 
 impl Interpolater for NothingInterpolation {
-    fn interpolate(&mut self) -> &[f32] {
+    fn interpolate(&mut self, buffer: &mut [f32]) {
         for point in self.ctx.supporting_points.iter() {
-            self.ctx.bar_values[point.x] = point.y;
+            buffer[point.x] = point.y;
         }
-
-        &self.ctx.bar_values
     }
 
     fn supporting_points_mut(&mut self) -> std::slice::IterMut<'_, super::SupportingPoint> {
@@ -41,7 +39,11 @@ mod tests {
             SupportingPoint { x: 4, y: 1.0 },
         ];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = NothingInterpolation::new(supporting_points);
-        assert_eq!(interpolator.interpolate(), &[0., 0., 0., 0.5, 1.0,]);
+
+        interpolator.interpolate(&mut buffer);
+
+        assert_eq!(&buffer, &[0., 0., 0., 0.5, 1.0,]);
     }
 }

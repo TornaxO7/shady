@@ -1,7 +1,7 @@
 use shady_audio::{fetcher::DummyFetcher, BarProcessor, BarProcessorConfig, SampleProcessor};
 
 fn main() {
-    let mut sample_processor = SampleProcessor::new(DummyFetcher::new());
+    let mut sample_processor = SampleProcessor::new(DummyFetcher::new(2));
     sample_processor.process_next_samples();
 
     let mut bar_processor = BarProcessor::new(&sample_processor, BarProcessorConfig::default());

@@ -18,9 +18,9 @@ impl InterpolationInner for LinearInterpolation {
 }
 
 impl Interpolater for LinearInterpolation {
-    fn interpolate(&mut self) -> &[f32] {
+    fn interpolate(&mut self, buffer: &mut [f32]) {
         for point in self.ctx.supporting_points.iter() {
-            self.ctx.bar_values[point.x] = point.y;
+            buffer[point.x] = point.y;
         }
 
         debug!("{:?}", self.ctx);
@@ -34,11 +34,9 @@ impl Interpolater for LinearInterpolation {
                 let t = (interpolate_idx + 1) as f32 / (amount + 1) as f32;
 
                 let idx = left.x + interpolate_idx + 1;
-                self.ctx.bar_values[idx] = t * right.y + (1. - t) * left.y;
+                buffer[idx] = t * right.y + (1. - t) * left.y;
             }
         }
-
-        &self.ctx.bar_values
     }
 
     fn supporting_points_mut(&mut self) -> IterMut<'_, SupportingPoint> {
@@ -53,7 +51,10 @@ mod tests {
     #[test]
     fn zero_supporting_points_and_zero_sections() {
         let mut interpolator = LinearInterpolation::new([]);
-        assert_eq!(interpolator.interpolate(), []);
+        let mut buffer = vec![];
+
+        interpolator.interpolate(&mut buffer);
+        assert!(buffer.is_empty());
     }
 
     #[test]
@@ -61,8 +62,11 @@ mod tests {
         let supporting_points = [SupportingPoint { x: 0, y: 0.5 }];
 
         let mut interpolator = LinearInterpolation::new(supporting_points);
+        let mut buffer = [0f32];
 
-        assert_eq!(interpolator.interpolate(), &[0.5]);
+        interpolator.interpolate(&mut buffer);
+
+        assert_eq!(&buffer, &[0.5]);
     }
 
     #[test]
@@ -72,9 +76,12 @@ mod tests {
             SupportingPoint { x: 4, y: 1.0 },
         ];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = LinearInterpolation::new(supporting_points);
 
-        assert_eq!(interpolator.interpolate(), &[0.0, 0.25, 0.5, 0.75, 1.0]);
+        interpolator.interpolate(&mut buffer);
+
+        assert_eq!(&buffer, &[0.0, 0.25, 0.5, 0.75, 1.0]);
     }
 
     #[test]
@@ -85,9 +92,12 @@ mod tests {
             SupportingPoint { x: 3, y: 0.0 },
         ];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = LinearInterpolation::new(supporting_points);
 
-        assert_eq!(interpolator.interpolate(), &[0.0, 0.5, 1.0, 0.0]);
+        interpolator.interpolate(&mut buffer);
+
+        assert_eq!(&buffer, &[0.0, 0.5, 1.0, 0.0]);
     }
 
     #[test]
@@ -98,13 +108,11 @@ mod tests {
             SupportingPoint { x: 6, y: 0.0 },
         ];
 
+        let mut buffer = vec![0f32; supporting_points.last().unwrap().x + 1];
         let mut interpolator = LinearInterpolation::new(supporting_points);
 
-        println!("{:?}", interpolator.ctx);
+        interpolator.interpolate(&mut buffer);
 
-        assert_eq!(
-            interpolator.interpolate(),
-            &[0.0, 0.5, 1.0, 0.75, 0.5, 0.25, 0.0],
-        );
+        assert_eq!(&buffer, &[0.0, 0.5, 1.0, 0.75, 0.5, 0.25, 0.0],);
     }
 }

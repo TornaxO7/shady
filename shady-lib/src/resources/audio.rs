@@ -23,7 +23,7 @@ pub struct Audio {
 impl Audio {
     pub fn fetch_audio(&mut self, sample_processor: &SampleProcessor) {
         let bars = self.bar_processor.process_bars(sample_processor);
-        self.bar_values.copy_from_slice(bars);
+        self.bar_values.copy_from_slice(&bars[0]);
     }
 
     pub fn set_bars(&mut self, device: &Device, amount_bars: NonZero<u16>) {
