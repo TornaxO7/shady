@@ -10,7 +10,7 @@ repository = "https://github.com/TornaxO7/shady/tree/main/shady-lib"
 [dependencies]
 bytemuck = { version = "1", features = ["derive"] }
 
-shady-audio = { path = "../shady-audio", version = "16.0", optional = true }
+shady-audio = { path = "../shady-audio", version = "17.0", optional = true }
 
 wgpu.workspace = true
 tracing.workspace = true
