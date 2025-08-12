@@ -870,15 +870,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f25c0e292a7ca6d6498557ff1df68f32c99850012b6ea401cf8daf771f22ff53"
 
 [[package]]
-name = "easing-function"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ff18235504129e34c411871066cfa4ad108ed6a28d5fb2417057aff7f99bee4"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2649,7 +2640,6 @@ version = "17.0.0"
 dependencies = [
  "apodize",
  "cpal",
- "easing-function",
  "nalgebra",
  "realfft",
  "thiserror 2.0.12",

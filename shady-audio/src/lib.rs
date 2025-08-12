@@ -99,7 +99,6 @@ mod sample_processor;
 
 pub use bar_processor::{BarProcessor, BarProcessorConfig, InterpolationVariant};
 pub use cpal;
-pub use easing_function::easings::StandardEasing;
 pub use sample_processor::SampleProcessor;
 
 use cpal::SampleRate;
