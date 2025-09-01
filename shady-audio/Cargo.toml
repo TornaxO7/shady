@@ -16,4 +16,4 @@ tracing.workspace = true
 thiserror.workspace = true
 
 apodize = "1"
-nalgebra = "0.33"
+nalgebra = "0.34"
