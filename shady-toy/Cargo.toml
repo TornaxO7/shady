@@ -8,7 +8,7 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 anyhow = "1"
-ariadne = "0.5"
+ariadne = "0.6"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 notify = "8"
 shady = { path = "../shady-lib", default-features = false }
