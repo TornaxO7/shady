@@ -10,7 +10,7 @@ repository = "https://github.com/TornaxO7/shady/tree/main/shady-cli"
 
 [dependencies]
 crossterm = "0.29.0"
-ratatui = "0.29"
+ratatui = "0.30"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 shady-audio = { path = "../shady-audio", version = "17" }
